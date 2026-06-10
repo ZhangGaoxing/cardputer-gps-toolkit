@@ -1,4 +1,4 @@
-# Merged GPS Toolkit
+# Cardputer GPS Toolkit
 
 A comprehensive GPS toolkit for M5Stack Cardputer ADV (ESP32-S3), integrating GPS data viewer and offline tile map with a horizontal-scroll menu UI.
 
@@ -205,7 +205,7 @@ MIT License
 
 ## Credits
 
-- Original projects [CardputerGPSMap](https://github.com/alcor55/Cardputer-GPS-Info) and [Cardputer-Adv-GPS-Info](https://github.com/alcor55/Cardputer-GPS-Info)
+- Original projects [CardputerGPSMap](https://github.com/lunarc3/CardputerGPSMap) and [Cardputer-Adv-GPS-Info](https://github.com/DevinWatson/Cardputer-Adv-GPS-Info)
 - [M5Stack](https://m5stack.com/) — Cardputer ADV hardware platform
 - [TinyGPSPlus](https://github.com/mikalhart/TinyGPSPlus) — NMEA parsing library
 - [JPEGDEC](https://github.com/bitbank2/JPEGDEC) — Embedded JPEG decoder

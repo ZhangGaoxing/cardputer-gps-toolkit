@@ -1,4 +1,4 @@
-# Merged GPS Toolkit
+# Cardputer GPS Toolkit
 
 适用于 M5Stack Cardputer ADV (ESP32-S3) 的综合 GPS 工具集，集成了 GPS 数据查看器与离线瓦片地图两大功能，提供横向滚动菜单 UI。
 
@@ -204,7 +204,7 @@ MIT License
 
 ## 致谢
 
-- 原始项目 [CardputerGPSMap](https://github.com/alcor55/Cardputer-GPS-Info) 和 [Cardputer-Adv-GPS-Info](https://github.com/alcor55/Cardputer-GPS-Info)
+- 原始项目 [CardputerGPSMap](https://github.com/lunarc3/CardputerGPSMap) 和 [Cardputer-Adv-GPS-Info](https://github.com/DevinWatson/Cardputer-Adv-GPS-Info)
 - [M5Stack](https://m5stack.com/) — Cardputer ADV 硬件平台
 - [TinyGPSPlus](https://github.com/mikalhart/TinyGPSPlus) — NMEA 解析库
 - [JPEGDEC](https://github.com/bitbank2/JPEGDEC) — 嵌入式 JPEG 解码器

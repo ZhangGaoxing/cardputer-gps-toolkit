@@ -49,11 +49,11 @@ void FnAbout::onUpdate(bool force) {
 
   cv.setTextColor(TFT_WHITE);
   cv.setCursor(28, y);
-  cv.print("CardputerGPSMap");
+  cv.print("lunarc3/CardputerGPSMap");
   y += lh;
 
   cv.setCursor(28, y);
-  cv.print("Cardputer-Adv-GPS-Info");
+  cv.print("DevinWatson/Cardputer-Adv-GPS-Info");
   y += lh + 6;
 }
 
