@@ -22,7 +22,8 @@ bool GpxWriter::begin() {
   // 尝试挂载SD卡
   int retries = 3;
   while (retries-- > 0) {
-    if (SD.begin(SD_CS_PIN, SPI, 4000000U)) {
+    if (SD.begin(SD_CS_PIN, SPI, SD_SPI_FREQ) ||
+        SD.begin(SD_CS_PIN, SPI, SD_SPI_FREQ_SAFE)) {
       _sdReady = true;
 
       // 确保存储目录存在

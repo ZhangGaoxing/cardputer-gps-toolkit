@@ -24,7 +24,7 @@
 | 主控 | M5Stack Cardputer ADV（ESP32-S3，无 PSRAM） |
 | GPS 模块 | ATGM336H（通过 Cap LoRa-1262 扩展板） |
 | GPS 连接 | UART2：RX=15, TX=13, 115200 bps |
-| SD 卡 | 仅离线地图功能需要（SPI：CS=12, MOSI=14, SCK=40, MISO=39） |
+| SD 卡 | World Map 矢量数据和离线瓦片地图均需要（SPI：CS=12, MOSI=14, SCK=40, MISO=39） |
 | 屏幕 | 240×135 TFT 彩色显示屏 |
 
 ## 编译与烧录
@@ -103,6 +103,26 @@ pio device monitor -b 115200
 |------|----------|------|
 | `Tab` | Trip | 切换子页面（Stats → Track → Alt → Speed → Record） |
 | `Enter` | Trip (Record标签) | 开始/停止 GPX 轨迹录制 |
+
+## World Map 矢量数据
+
+World Map 的 Natural Earth 矢量资源全部保存在 SD 卡中。请将 `vector_bin/` 目录内容复制到 SD 卡的 `/gpsmap/vector/`：
+
+```
+SD卡:
+└── gpsmap/
+    └── vector/
+        ├── coast.bin / coast.idx
+        ├── border.bin / border.idx
+        ├── state.bin / state.idx
+        ├── river.bin / river.idx
+        ├── lake.bin / lake.idx
+        ├── coast_low.bin / coast_low.idx
+        ├── border_low.bin / border_low.idx
+        └── cities.bin
+```
+
+固件也兼容 `/gpsmap/*.bin` 和 `/vector_bin/*.bin` 作为备用路径。只要有 `coast.bin` 或 `border.bin`，地图就会打开；`cities.bin` 用于城市点和放大后的地名显示；`.idx` 文件用于按视口跳过屏幕外的矢量线段，显著加快加载和缩放。若重新生成任意 `.bin` 文件，请运行 `tools/build_vector_indexes.py vector_bin`，并把更新后的 `.idx` 一起复制到 SD 卡。
 
 ## 离线地图准备
 
@@ -193,10 +213,10 @@ cardputer-gps-toolkit/
 
 - 单一共享 `M5Canvas` 帧缓冲（~65KB SRAM）
 - JPEG 解码缓冲按需 `malloc`/`free`（~37KB 峰值）
-- SD 卡 SPI 延迟初始化（仅在进入离线地图功能时）
+- SD 卡 SPI 按需初始化，用于 SD 地图和 GPX 功能
 - 卫星列表使用 `std::vector`（动态增长）
-- 矢量地图数据从 SD 卡加载到 PSRAM（~2.2MB）
-- 峰值堆内存使用约 2.5MB，低于 8MB PSRAM 限制
+- World Map 矢量数据保留在 SD 卡，仅按需流式读取小块 `.idx` 缓冲
+- 峰值堆内存保持适配无 PSRAM 的 Cardputer ADV
 
 ## 许可证
 

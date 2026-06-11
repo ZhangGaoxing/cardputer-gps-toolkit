@@ -22,6 +22,8 @@
 #define SD_SCK_PIN   40
 #define SD_MISO_PIN  39
 #define LORA_CS_PIN  5    // LoRa CS 保持高电平避免 SPI 冲突
+#define SD_SPI_FREQ       10000000U
+#define SD_SPI_FREQ_SAFE   4000000U
 
 // ==================================================================
 //  显示屏参数
@@ -72,7 +74,17 @@
 #define PATH_STATE_BIN      "/gpsmap/vector/state.bin"
 #define PATH_RIVER_BIN      "/gpsmap/vector/river.bin"
 #define PATH_LAKE_BIN       "/gpsmap/vector/lake.bin"
+#define PATH_CITIES_BIN     "/gpsmap/vector/cities.bin"
 #define PATH_COAST_LOW_BIN  "/gpsmap/vector/coast_low.bin"
+#define PATH_BORDER_LOW_BIN "/gpsmap/vector/border_low.bin"
+
+#define PATH_COAST_IDX      "/gpsmap/vector/coast.idx"
+#define PATH_BORDER_IDX     "/gpsmap/vector/border.idx"
+#define PATH_STATE_IDX      "/gpsmap/vector/state.idx"
+#define PATH_RIVER_IDX      "/gpsmap/vector/river.idx"
+#define PATH_LAKE_IDX       "/gpsmap/vector/lake.idx"
+#define PATH_COAST_LOW_IDX  "/gpsmap/vector/coast_low.idx"
+#define PATH_BORDER_LOW_IDX "/gpsmap/vector/border_low.idx"
 
 // 坐标缩放因子（度 * 100 存储为 int16_t）
 #define COORD_SCALE 100

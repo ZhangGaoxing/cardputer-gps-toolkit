@@ -4,6 +4,9 @@
 #include "sd_manager.h"
 #include "display_manager.h"
 
+static_assert(sizeof(VectorSegmentIndexEntry) == 16,
+              "Vector index records must stay 16 bytes");
+
 // ============================================================================
 //  VectorReader 实现（流式 SD 读取，512B 扇区缓冲）
 // ============================================================================
@@ -35,6 +38,15 @@ void VectorReader::rewind() {
   _eof = false;
 }
 
+bool VectorReader::seek(uint32_t byteOffset) {
+  if (!_isOpen || !_file) return false;
+  bool ok = _file.seek(byteOffset);
+  _bufPos = 0;
+  _bufLen = 0;
+  _eof = !ok;
+  return ok;
+}
+
 bool VectorReader::_fill() {
   if (!_isOpen || !_file || _eof) return false;
   size_t toRead = BUF_SIZE * sizeof(int16_t);
@@ -60,6 +72,46 @@ int16_t VectorReader::peekNext() {
     if (!_fill()) return 0x7FFF;
   }
   return _buf[_bufPos];
+}
+
+bool VectorIndexReader::open(const char* path) {
+  if (_isOpen) close();
+  _file = SD.open(path, FILE_READ);
+  _isOpen = (bool)_file;
+  _bufPos = 0;
+  _bufLen = 0;
+  return _isOpen;
+}
+
+void VectorIndexReader::close() {
+  if (_file) { _file.close(); _file = File(); }
+  _isOpen = false;
+  _bufPos = 0;
+  _bufLen = 0;
+}
+
+void VectorIndexReader::rewind() {
+  if (_isOpen && _file) {
+    _file.seek(0);
+  }
+  _bufPos = 0;
+  _bufLen = 0;
+}
+
+bool VectorIndexReader::_fill() {
+  if (!_isOpen || !_file) return false;
+  size_t rd = _file.read((uint8_t*)_buf, sizeof(_buf));
+  _bufLen = rd / sizeof(VectorSegmentIndexEntry);
+  _bufPos = 0;
+  return _bufLen > 0;
+}
+
+bool VectorIndexReader::readNext(VectorSegmentIndexEntry& entry) {
+  if (_bufPos >= _bufLen) {
+    if (!_fill()) return false;
+  }
+  entry = _buf[_bufPos++];
+  return true;
 }
 
 // ============================================================================
@@ -103,8 +155,10 @@ bool SDManager::begin() {
   SPI.begin(SD_SCK_PIN, SD_MISO_PIN, SD_MOSI_PIN, SD_CS_PIN);
 
   // 尝试挂载SD卡（最多重试5次）
-  for (int retry = 0; retry < 5; retry++) {
-    if (SD.begin(SD_CS_PIN)) {
+  const uint32_t freqs[] = {SD_SPI_FREQ, SD_SPI_FREQ_SAFE};
+  for (int fi = 0; fi < 2; fi++) {
+    for (int retry = 0; retry < 3; retry++) {
+      if (SD.begin(SD_CS_PIN, SPI, freqs[fi])) {
       _ready = true;
       // 初始化截图计数器
       _shotCounter = 0;
@@ -131,7 +185,8 @@ bool SDManager::begin() {
       }
       return true;
     }
-    delay(300);
+      delay(200);
+    }
   }
 
   return false;  // 5次重试全部失败

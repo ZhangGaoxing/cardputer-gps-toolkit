@@ -8,7 +8,7 @@
 
 class FnWorldMap : public SubFunction {
 public:
-  FnWorldMap() : SubFunction("World Map", ICON_WORLD_MAP) { setUpdateInterval(500); }
+  FnWorldMap() : SubFunction("World Map", ICON_WORLD_MAP) { setUpdateInterval(5000); }
   void onEnter() override;
   void onExit() override;
   void onUpdate(bool force) override;
@@ -16,9 +16,18 @@ public:
   void drawIcon(int x, int y, int size, uint16_t color) override;
 
 private:
+  void drawMap(bool force);
+
   int _zoom = 0;
   bool _sdReady = false;
-  VectorReader _coastReader, _borderReader, _stateReader, _riverReader, _lakeReader;
+  bool _indexReady = false;
+  bool _citiesReady = false;
+  bool _coastReady = false;
+  bool _borderReady = false;
+  bool _stateReady = false;
+  bool _riverReady = false;
+  bool _lakeReady = false;
+  const char* _errorMsg = nullptr;
 };
 
 #endif

@@ -24,7 +24,7 @@ A comprehensive GPS toolkit for M5Stack Cardputer ADV (ESP32-S3), integrating GP
 | MCU | M5Stack Cardputer ADV (ESP32-S3, no PSRAM) |
 | GPS Module | ATGM336H (via Cap LoRa-1262 expansion board) |
 | GPS Connection | UART2: RX=15, TX=13, 115200 bps |
-| SD Card | Required only for offline map (SPI: CS=12, MOSI=14, SCK=40, MISO=39) |
+| SD Card | Required for World Map vector data and offline map tiles (SPI: CS=12, MOSI=14, SCK=40, MISO=39) |
 | Display | 240×135 TFT color display |
 
 ## Build & Flash
@@ -103,6 +103,26 @@ pio device monitor -b 115200
 |-----|----------|--------|
 | `Tab` | Trip | Switch sub-tab (Stats → Track → Alt → Speed → Record) |
 | `Enter` | Trip (Record tab) | Start/stop GPX track recording |
+
+## World Map Vector Data
+
+World Map keeps all Natural Earth vector resources on the SD card. Copy the contents of `vector_bin/` to `/gpsmap/vector/`:
+
+```
+SD Card:
+└── gpsmap/
+    └── vector/
+        ├── coast.bin / coast.idx
+        ├── border.bin / border.idx
+        ├── state.bin / state.idx
+        ├── river.bin / river.idx
+        ├── lake.bin / lake.idx
+        ├── coast_low.bin / coast_low.idx
+        ├── border_low.bin / border_low.idx
+        └── cities.bin
+```
+
+The firmware also accepts `/gpsmap/*.bin` and `/vector_bin/*.bin` as fallback locations. `coast.bin` or `border.bin` is enough for the map to open. `cities.bin` enables city dots and labels, and `.idx` files keep zoom/redraw fast by letting the firmware skip off-screen vector segments. If you regenerate any `.bin` file, run `tools/build_vector_indexes.py vector_bin` and copy the updated `.idx` files to the SD card too.
 
 ## Offline Map Preparation
 
@@ -194,10 +214,10 @@ cardputer-gps-toolkit/
 
 - Single shared `M5Canvas` frame buffer (~65 KB SRAM)
 - JPEG decode buffer: `malloc`/`free` per tile (~37 KB peak)
-- SD card SPI: lazy initialization (only when entering offline map)
+- SD card SPI: lazy initialization for SD-backed map and GPX features
 - Satellite list: `std::vector` (dynamic growth)
-- Vector map data loaded from SD card (~2.2 MB PSRAM)
-- Peak heap usage ~2.5 MB, well within 8 MB PSRAM limit
+- World Map vector data stays on SD card; small `.idx` buffers are streamed on demand
+- Peak heap usage remains SRAM-friendly for Cardputer ADV without PSRAM
 
 ## License
 

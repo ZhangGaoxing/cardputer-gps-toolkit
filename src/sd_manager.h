@@ -22,6 +22,7 @@ public:
   void close();
   bool isOpen() const { return _isOpen; }
   void rewind();
+  bool seek(uint32_t byteOffset);
   int16_t readNext();      // EOF时返回 0x7FFF
   int16_t peekNext();      // EOF时返回 0x7FFF
 
@@ -34,6 +35,34 @@ private:
   size_t _bufPos = 0;
   size_t _bufLen = 0;
   bool _fill();            // 填充缓冲区，EOF 时设 _eof 并返回 false
+};
+
+struct VectorSegmentIndexEntry {
+  int16_t minLat;
+  int16_t maxLat;
+  int16_t minLon;
+  int16_t maxLon;
+  uint32_t dataOffset;
+  uint16_t pointCount;
+  uint16_t reserved;
+};
+
+class VectorIndexReader {
+public:
+  bool open(const char* path);
+  void close();
+  bool isOpen() const { return _isOpen; }
+  void rewind();
+  bool readNext(VectorSegmentIndexEntry& entry);
+
+private:
+  File _file;
+  bool _isOpen = false;
+  static const size_t BUF_SIZE = 8;
+  VectorSegmentIndexEntry _buf[BUF_SIZE];
+  size_t _bufPos = 0;
+  size_t _bufLen = 0;
+  bool _fill();
 };
 
 class SDManager {
