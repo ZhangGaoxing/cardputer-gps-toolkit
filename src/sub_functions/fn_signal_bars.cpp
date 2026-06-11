@@ -52,10 +52,10 @@ void FnSignalBars::_drawBars() {
   GPSManager& gps = GPSManager::instance();
   const auto& allSats = gps.satellites();
 
-  // 收集可见且有信号的卫星
+  // 收集全部可见卫星；SNR=0 的卫星也计入总数。
   std::vector<const SatData*> visSats;
   for (auto& sat : allSats) {
-    if (sat.visible && sat.snr > 0) visSats.push_back(&sat);
+    if (sat.visible) visSats.push_back(&sat);
   }
 
   if (visSats.empty()) {
@@ -228,7 +228,7 @@ void FnSignalBars::_drawConstellation() {
 
   cv.drawLine(4, y - 2, 200, y - 2, TFT_DARKGREY);
   int totalVis = gpV + glV + gaV + bdV + qzV;
-  int totalUsed = gpU + glU + gaU + bdU + qzU;
+  int totalUsed = gps.satellitesUsed();
   cv.setTextColor(TFT_GREEN);
   cv.setCursor(18, y);
   snprintf(buf, sizeof(buf), "%-11s %3d     %3d", "Total", totalVis, totalUsed);

@@ -187,17 +187,28 @@ void GPSManager::_parseGSV(const String& line) {
 }
 
 void GPSManager::_parseGSA(const String& line) {
+  String preferredSystem;
+  if (line.startsWith("$GPGSA")) preferredSystem = "GPS";
+  else if (line.startsWith("$GLGSA")) preferredSystem = "GLONASS";
+  else if (line.startsWith("$GAGSA")) preferredSystem = "Galileo";
+  else if (line.startsWith("$BDGSA")) preferredSystem = "BeiDou";
+  else if (line.startsWith("$GQGSA")) preferredSystem = "QZSS";
+
   String f2 = getField(line, 2);
   if (f2.length() > 0) _gsaFixMode = f2.toInt();
+
+  unsigned long now = millis();
+  if (_lastGsaMillis == 0 || now - _lastGsaMillis > 400) {
+    _clearUsedFlags();
+  }
+  _lastGsaMillis = now;
 
   // 解析参与定位的卫星ID（字段3-14）
   for (int i = 3; i <= 14; i++) {
     String sid = getField(line, i);
     if (sid.length() > 0) {
       int id = sid.toInt();
-      for (auto& sat : _satellites) {
-        if (sat.id == id) sat.used = true;
-      }
+      _markUsedSatellite(preferredSystem, id);
     }
   }
 
@@ -206,6 +217,34 @@ void GPSManager::_parseGSA(const String& line) {
 
   String fv = getField(line, 17);
   if (fv.length() > 0) _vdop = fv.toFloat();
+}
+
+void GPSManager::_clearUsedFlags() {
+  for (auto& sat : _satellites) sat.used = false;
+}
+
+void GPSManager::_markUsedSatellite(const String& preferredSystem, int id) {
+  int bestIndex = -1;
+  int bestScore = -1;
+
+  for (int i = 0; i < (int)_satellites.size(); i++) {
+    const auto& sat = _satellites[i];
+    if (sat.id != id) continue;
+
+    int score = 0;
+    if (preferredSystem.length() > 0 && sat.system == preferredSystem) score += 100;
+    if (sat.visible) score += 10;
+    score += constrain(sat.snr, 0, 9);
+
+    if (score > bestScore) {
+      bestScore = score;
+      bestIndex = i;
+    }
+  }
+
+  if (bestIndex >= 0) {
+    _satellites[bestIndex].used = true;
+  }
 }
 
 void GPSManager::_parseGGA(const String& line) {
@@ -223,7 +262,7 @@ GSVSequenceState* GPSManager::_getGSVState(const String& system) {
   for (int i = 0; i < _gsvCount; i++) {
     if (_gsvStates[i].system == system) return &_gsvStates[i];
   }
-  if (_gsvCount < 5) {
+  if (_gsvCount < 6) {
     _gsvStates[_gsvCount].system = system;
     return &_gsvStates[_gsvCount++];
   }

@@ -129,9 +129,9 @@ void FnGpsDashboard::_drawTabFix() {
   cv.setCursor(4,y); snprintf(buf,sizeof(buf),"HDOP: %.1f (%s)",gps.hdop(),dopQuality(gps.hdop())); cv.print(buf); y+=lh;
   cv.setCursor(4,y); snprintf(buf,sizeof(buf),"VDOP: %.1f (%s)",gps.vdop(),dopQuality(gps.vdop())); cv.print(buf); y+=lh;
 
-  const auto& sats=gps.satellites(); int totVis=0,totUsed=0,gpV=0,glV=0,gaV=0,bdV=0,qzV=0;
-  for (auto& sat:sats){if(sat.used)totUsed++;if(sat.visible){totVis++;if(sat.system=="GPS")gpV++;else if(sat.system=="GLONASS")glV++;else if(sat.system=="Galileo")gaV++;else if(sat.system=="BeiDou")bdV++;else if(sat.system=="QZSS")qzV++;}}
-  cv.setTextColor(TFT_LIGHTGREY); cv.setCursor(4,y); snprintf(buf,sizeof(buf),"Used:%d Vis:%d Tot:%d",totUsed,totVis,(int)sats.size()); cv.print(buf); y+=lh;
+  const auto& sats=gps.satellites(); int totVis=0,gpV=0,glV=0,gaV=0,bdV=0,qzV=0;
+  for (auto& sat:sats){if(sat.visible){totVis++;if(sat.system=="GPS")gpV++;else if(sat.system=="GLONASS")glV++;else if(sat.system=="Galileo")gaV++;else if(sat.system=="BeiDou")bdV++;else if(sat.system=="QZSS")qzV++;}}
+  cv.setTextColor(TFT_LIGHTGREY); cv.setCursor(4,y); snprintf(buf,sizeof(buf),"Used:%d Vis:%d Tot:%d",gps.satellitesUsed(),totVis,(int)sats.size()); cv.print(buf); y+=lh;
   cv.setCursor(4,y); snprintf(buf,sizeof(buf),"GP:%d GL:%d GA:%d BD:%d QZ:%d",gpV,glV,gaV,bdV,qzV); cv.print(buf); y+=lh;
   cv.setCursor(4,y); if(gps.geoidValid()) snprintf(buf,sizeof(buf),"Geoid:%.1fm",gps.geoidHeight()); else snprintf(buf,sizeof(buf),"Geoid:N/A"); cv.print(buf); y+=lh;
   if(imu.isAvailable()){cv.setCursor(4,y);snprintf(buf,sizeof(buf),"IMU P:%+.0f R:%+.0f G:%.1f T:%.0fC",imu.pitch(),imu.roll(),imu.gForce(),imu.temperature());cv.print(buf);}

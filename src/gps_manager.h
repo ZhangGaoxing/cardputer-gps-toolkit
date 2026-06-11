@@ -94,6 +94,8 @@ private:
   void _parseGSV(const String& line);
   void _parseGSA(const String& line);
   void _parseGGA(const String& line);
+  void _clearUsedFlags();
+  void _markUsedSatellite(const String& preferredSystem, int id);
   GSVSequenceState* _getGSVState(const String& system);
   void _storeSatellite(const SatData& sat);
 
@@ -104,7 +106,7 @@ private:
 
   // 卫星数据
   std::vector<SatData> _satellites;
-  GSVSequenceState _gsvStates[5];
+  GSVSequenceState _gsvStates[6];
   int _gsvCount = 0;
 
   // 定位质量
@@ -123,6 +125,7 @@ private:
   // 调试标志
   bool _nmeaSerial = false;
   bool _satListSerial = false;
+  unsigned long _lastGsaMillis = 0;
 };
 
 #endif // GPS_MANAGER_H

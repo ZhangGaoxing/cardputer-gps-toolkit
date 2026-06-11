@@ -112,10 +112,12 @@ void Fn3DGlobe::onEnter() {
     return;
   }
   _sdReady = _coastLowReader.open(PATH_COAST_LOW_BIN);
+  _borderLowReader.open(PATH_BORDER_LOW_BIN);
 }
 
 void Fn3DGlobe::onExit() {
   _coastLowReader.close();
+  _borderLowReader.close();
   _sdReady = false;
 }
 
@@ -192,9 +194,27 @@ void Fn3DGlobe::onUpdate(bool force) {
       sc, cc, st, ct, gcx, gcy, ER, camLon100,
       0x07C0, 0x0380, 0x01C0);
 
+  if (_borderLowReader.isOpen()) {
+    globeRenderLayer(_borderLowReader,
+        sc, cc, st, ct, gcx, gcy, ER, camLon100,
+        0x4A49, 0x2924, 0x1482);
+  }
+
+  if (hasLoc) {
+    int ux, uy; float uz;
+    int uLatCD = (int)(gps.latitude() * 100);
+    int uLonCD = (int)(gps.longitude() * 100);
+    GLOBE_PROJ(uLatCD, uLonCD, 1.0f, ux, uy, uz);
+    if (uz > 0) {
+      cv.drawLine(ux - 6, uy, ux + 6, uy, TFT_RED);
+      cv.drawLine(ux, uy - 6, ux, uy + 6, TFT_RED);
+      cv.fillCircle(ux, uy, 2, TFT_RED);
+    }
+  }
+
   // --- Draw satellites at correct orbital positions ---
-  // Count ALL visible satellites per system (match Constellation)
-  int gpsCnt = 0, glnCnt = 0, galCnt = 0, bdsCnt = 0;
+  // Count all visible satellites per system to match Signal/Constellation.
+  int gpsCnt = 0, glnCnt = 0, galCnt = 0, bdsCnt = 0, qzssCnt = 0;
   {
     const auto& csats = gps.satellites();
     for (size_t i = 0; i < csats.size(); i++) {
@@ -203,6 +223,7 @@ void Fn3DGlobe::onUpdate(bool force) {
       else if (csats[i].system == "GLONASS") glnCnt++;
       else if (csats[i].system == "Galileo") galCnt++;
       else if (csats[i].system == "BeiDou")  bdsCnt++;
+      else if (csats[i].system == "QZSS")    qzssCnt++;
     }
   }
 
@@ -217,11 +238,12 @@ void Fn3DGlobe::onUpdate(bool force) {
       if (!sat.visible || sat.elevation < 1) continue;
 
       float orbitR; uint16_t col;
-      if      (sat.system == "GPS")     { orbitR = 4.17f; col = TFT_YELLOW; }
-      else if (sat.system == "GLONASS") { orbitR = 4.00f; col = TFT_CYAN;   }
-      else if (sat.system == "Galileo") { orbitR = 4.65f; col = 0x54BF;     }
-      else if (sat.system == "BeiDou")  { orbitR = 4.38f; col = TFT_ORANGE; }
-      else                              { orbitR = 4.17f; col = TFT_WHITE;  }
+      if      (sat.system == "GPS")     { orbitR = 4.17f; col = TFT_YELLOW;  }
+      else if (sat.system == "GLONASS") { orbitR = 4.00f; col = TFT_CYAN;    }
+      else if (sat.system == "Galileo") { orbitR = 4.65f; col = 0x54BF;      }
+      else if (sat.system == "BeiDou")  { orbitR = 4.38f; col = TFT_ORANGE;  }
+      else if (sat.system == "QZSS")    { orbitR = 4.17f; col = TFT_MAGENTA; }
+      else                                { orbitR = 4.17f; col = TFT_WHITE;   }
 
       float visR = 1.0f + (orbitR - 1.0f) * 0.22f;
       float elR = sat.elevation * DEG_TO_RAD;
@@ -268,13 +290,14 @@ void Fn3DGlobe::onUpdate(bool force) {
   }
 
   // Legend — left column, with counts
-  int ly = SCREEN_H - 32;
+  int ly = SCREEN_H - 40;
   char lbuf[16];
   cv.setTextSize(1);
   cv.setTextColor(TFT_YELLOW); snprintf(lbuf,sizeof(lbuf),"GPS %d",gpsCnt); cv.setCursor(2,ly); cv.print(lbuf);
   cv.setTextColor(TFT_CYAN);   snprintf(lbuf,sizeof(lbuf),"GLN %d",glnCnt); cv.setCursor(2,ly+8); cv.print(lbuf);
   cv.setTextColor(0x54BF);      snprintf(lbuf,sizeof(lbuf),"GAL %d",galCnt); cv.setCursor(2,ly+16); cv.print(lbuf);
   cv.setTextColor(TFT_ORANGE); snprintf(lbuf,sizeof(lbuf),"BDS %d",bdsCnt); cv.setCursor(2,ly+24); cv.print(lbuf);
+  cv.setTextColor(TFT_MAGENTA); snprintf(lbuf,sizeof(lbuf),"QZS %d",qzssCnt); cv.setCursor(2,ly+32); cv.print(lbuf);
 
   // Top line — lat/lon
   if (hasLoc) {

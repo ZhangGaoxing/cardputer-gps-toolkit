@@ -19,6 +19,7 @@ private:
   unsigned long _lastMs = 0;
   bool _sdReady = false;
   VectorReader _coastLowReader;
+  VectorReader _borderLowReader;
 };
 
 #endif
