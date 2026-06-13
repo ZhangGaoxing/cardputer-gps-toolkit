@@ -68,8 +68,8 @@ bool GpxWriter::startRecording(int year, int month, int day,
     return false;
   }
 
-  // Arduino-ESP32 FILE_WRITE appends existing files, so only open after proving
-  // the temp and final paths do not exist. This prevents duplicate XML headers.
+  // Arduino-ESP32 FILE_WRITE truncates existing files. Only open after proving
+  // the temp and final paths do not exist, so a recording never overwrites data.
   if (SD.exists(_tmpFilePath) || SD.exists(_filePath)) {
     _setError("GPX file already exists");
     return false;
@@ -347,7 +347,9 @@ bool GpxWriter::_recoverIncompleteFiles() {
 
     if (fullPath.endsWith(".gpx.tmp")) {
       allOk = _recoverOneFile(fullPath.c_str(), true) && allOk;
-    } else if (fullPath.endsWith(".gpx") && !_fileHasFooter(fullPath.c_str())) {
+    } else if (fullPath.endsWith(".gpx") &&
+               (!_fileHasHeader(fullPath.c_str()) ||
+                !_fileHasFooter(fullPath.c_str()))) {
       allOk = _recoverOneFile(fullPath.c_str(), false) && allOk;
     }
   }
@@ -405,7 +407,7 @@ bool GpxWriter::_fileHasFooter(const char* path) {
 }
 
 bool GpxWriter::_appendFooterToPath(const char* path) {
-  File f = SD.open(path, FILE_WRITE);
+  File f = SD.open(path, FILE_APPEND);
   if (!f) return false;
   size_t written = f.print(GPX_FOOTER);
   f.flush();
