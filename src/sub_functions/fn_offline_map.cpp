@@ -91,7 +91,7 @@ void FnOfflineMap::onUpdate(bool force) {
   M5Canvas& cv = DisplayManager::instance().canvas();
   GPSManager& gps = GPSManager::instance();
 
-  if (gps.hasFix()) {
+  if (gps.hasReliableFix()) {
     _gpsLat = clampMapLat(gps.latitude());
     _gpsLon = wrapMapLon(gps.longitude());
     _hasGpsPosition = true;
@@ -101,6 +101,8 @@ void FnOfflineMap::onUpdate(bool force) {
       _hasPosition = true;
       _centeredOnGps = true;
     }
+  } else {
+    _hasGpsPosition = false;
   }
 
   cv.fillScreen(MAP_BG_COLOR);
@@ -211,7 +213,7 @@ bool FnOfflineMap::onKeyEvent(const KeyEvent& event) {
 
 void FnOfflineMap::_centerOnGps() {
   GPSManager& gps = GPSManager::instance();
-  if (!gps.hasFix()) return;
+  if (!gps.hasReliableFix()) return;
 
   _gpsLat = clampMapLat(gps.latitude());
   _gpsLon = wrapMapLon(gps.longitude());

@@ -50,6 +50,10 @@
 // ==================================================================
 #define GPS_TIMEOUT          1000   // GPS数据超时判定为错误状态(ms)
 #define TRACK_RECORD_INTERVAL 2000  // 轨迹记录间隔(ms)
+#define GPS_FIX_MAX_AGE_MS       3000
+#define GPS_NMEA_MAX_AGE_MS      3000
+#define GPS_RELIABLE_HDOP_MAX    8.0f
+#define GPS_MIN_SATELLITES_USED  4
 
 // ==================================================================
 //  离线地图参数
@@ -149,7 +153,14 @@ enum IconType {
 // ==================================================================
 //  GPS 状态枚举
 // ==================================================================
-enum GPSState { GPS_OFF = 0, GPS_ON, GPS_ERR };
+enum GPSState {
+  GPS_OFF = 0,
+  GPS_ON,
+  GPS_ERR,
+  GPS_SEARCHING,
+  GPS_FIX,
+  GPS_RELIABLE_FIX
+};
 
 // ==================================================================
 //  按键事件结构体

@@ -57,7 +57,7 @@ void FnGpsClock::onUpdate(bool force) {
   cv.setTextColor(TFT_LIGHTGREY);
   int dowY = dateY + 16 + 5;
   const char* days[] = {"Sat","Sun","Mon","Tue","Wed","Thu","Fri"};
-  if (rtc.dateValid() && gps.hasFix()) {
+  if (rtc.dateValid() && gps.hasFreshFix()) {
     int y2 = rtc.localYear(), m2 = rtc.localMonth(), d2 = rtc.localDay();
     if (m2 < 3) { m2 += 12; y2--; }
     int dow = (d2 + (13*(m2+1))/5 + y2 + y2/4 - y2/100 + y2/400) % 7;
@@ -81,8 +81,8 @@ void FnGpsClock::onUpdate(bool force) {
 
   // GPS fix状态
   int fixY = utcY + 8 + 4;
-  const char* fixStr = (gps.ggaFixQuality() >= 1) ? "Fix OK" : "No Fix";
-  uint16_t fixCol = (gps.ggaFixQuality() >= 1) ? TFT_GREEN : TFT_RED;
+  const char* fixStr = gps.hasReliableFix() ? "Fix OK" : "No Fix";
+  uint16_t fixCol = gps.hasReliableFix() ? TFT_GREEN : TFT_RED;
   cv.setTextColor(fixCol);
   snprintf(buf, sizeof(buf), "GPS: %s", fixStr);
   int fixW = strlen(buf) * 6;

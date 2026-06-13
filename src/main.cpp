@@ -96,12 +96,14 @@ void loop() {
 
   // 2. 同步RTC时间（当GPS有有效时间时）
   GPSManager& gps = GPSManager::instance();
+  bool hasFreshFix = gps.hasFreshFix();
+  bool hasReliableFix = gps.hasReliableFix();
   if (gps.timeValid()) {
     RTCManager::instance().update(
       gps.utcYear(), gps.utcMonth(), gps.utcDay(),
       gps.utcHour(), gps.utcMinute(), gps.utcSecond(),
       gps.latitude(), gps.longitude(),
-      gps.hasFix(), gps.dateValid()
+      hasFreshFix, gps.dateValid()
     );
   }
 
@@ -115,13 +117,13 @@ void loop() {
   TripTracker::instance().update(
     gps.latitude(), gps.longitude(),
     gps.altitude(), gps.speedKmph(),
-    gps.hasFix()
+    hasReliableFix
   );
 
   // 6. 更新GPX轨迹录制（SD卡持久化，独立于页面切换）
   {
     GpxWriter& gw = GpxWriter::instance();
-    if (gw.isRecording() && gps.hasFix()) {
+    if (gw.isRecording() && hasReliableFix) {
       static unsigned long lastGpxRecord = 0;
       unsigned long now = millis();
       // 2秒间隔 + 位置变化检查

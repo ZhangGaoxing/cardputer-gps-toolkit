@@ -10,6 +10,13 @@
 
 static const int CELL_W = 90;
 
+static const char* gpsStatusText(GPSManager& gps, bool compact) {
+  if (!gps.hasRecentGnssData()) return compact ? "NoData" : "No Data";
+  if (gps.hasReliableFix()) return compact ? "Reliable" : "Reliable Fix";
+  if (gps.hasFreshFix()) return compact ? "Fresh" : "Fresh Fix";
+  return compact ? "GNSS" : "GNSS Active";
+}
+
 void FnGpsDashboard::onEnter() { _tab = 0; }
 
 void FnGpsDashboard::onUpdate(bool force) {
@@ -48,27 +55,18 @@ void FnGpsDashboard::_drawTabMain() {
   const char* c2labels[] = {"Vis","Usd","PD","HD","VD","Gp/Gl","Ga/Bd","Qz"};
   char c1values[8][20];
   char c2values[8][12];
+  bool hasReliableFix = gps.hasReliableFix();
 
-  if (gps.hasFix()) {snprintf(c1values[0],20,"%.6f",gps.latitude());} else {snprintf(c1values[0],20,"NoFix");}
-  if (gps.hasFix()) {snprintf(c1values[1],20,"%.6f",gps.longitude());} else {snprintf(c1values[1],20,"NoFix");}
-  snprintf(c1values[2],20,"%.1fm", gps.altitude());
-  snprintf(c1values[3],20,"%.1f", gps.speedKmph());
-  snprintf(c1values[4],20,"%.1f", gps.courseDeg());
+  if (hasReliableFix) {snprintf(c1values[0],20,"%.6f",gps.latitude());} else {snprintf(c1values[0],20,"--");}
+  if (hasReliableFix) {snprintf(c1values[1],20,"%.6f",gps.longitude());} else {snprintf(c1values[1],20,"--");}
+  if (hasReliableFix) {snprintf(c1values[2],20,"%.1fm", gps.altitude());} else {snprintf(c1values[2],20,"--");}
+  if (hasReliableFix) {snprintf(c1values[3],20,"%.1f", gps.speedKmph());} else {snprintf(c1values[3],20,"--");}
+  if (hasReliableFix) {snprintf(c1values[4],20,"%.1f", gps.courseDeg());} else {snprintf(c1values[4],20,"--");}
   if (gps.dateValid()) {snprintf(c1values[5],20,"%02d/%02d/%02d",gps.utcDay(),gps.utcMonth(),gps.utcYear()%100);}
     else {snprintf(c1values[5],20,"NoData");}
   if (gps.timeValid()) {snprintf(c1values[6],20,"%02d:%02d:%02d",gps.utcHour(),gps.utcMinute(),gps.utcSecond());}
     else {snprintf(c1values[6],20,"NoData");}
-  {
-    const char* fixQ="None";
-    if (gps.ggaFixQuality()==1) fixQ="GPS";
-    else if (gps.ggaFixQuality()==2) fixQ="DGPS";
-    else if (gps.ggaFixQuality()==4) fixQ="RTK";
-    else if (gps.ggaFixQuality()==5) fixQ="FRTK";
-    const char* fixM="";
-    if (gps.gsaFixMode()==2) fixM=" 2D";
-    else if (gps.gsaFixMode()==3) fixM=" 3D";
-    snprintf(c1values[7],20,"%s%s",fixQ,fixM);
-  }
+  snprintf(c1values[7],20,"%s",gpsStatusText(gps, true));
 
   int totVis=0,totUsed=0,gpV=0,glV=0,gaV=0,bdV=0,qzV=0;
   const auto& sats=gps.satellites();
@@ -116,7 +114,10 @@ void FnGpsDashboard::_drawTabFix() {
   GPSManager& gps = GPSManager::instance();
   IMUManager& imu = IMUManager::instance();
 
-  cv.setTextSize(1); int y = CONTENT_TOP + 12; int lh = 14; char buf[40];
+  cv.setTextSize(1); int y = CONTENT_TOP + 10; int lh = 12; char buf[40];
+
+  cv.setTextColor(gps.hasReliableFix() ? TFT_GREEN : (gps.hasFreshFix() ? TFT_YELLOW : TFT_LIGHTGREY));
+  cv.setCursor(4,y); snprintf(buf,sizeof(buf),"Status:      %s",gpsStatusText(gps, false)); cv.print(buf); y+=lh;
 
   const char* fixQ = "None";
   if (gps.ggaFixQuality()==1) fixQ="GPS"; else if (gps.ggaFixQuality()==2) fixQ="DGPS"; else if (gps.ggaFixQuality()==4) fixQ="RTK"; else if (gps.ggaFixQuality()==5) fixQ="Float RTK";
@@ -140,7 +141,7 @@ void FnGpsDashboard::_drawTabFix() {
 void FnGpsDashboard::_drawTabCoord() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   GPSManager& gps = GPSManager::instance();
-  if (!gps.hasFix()) { cv.setTextSize(2); cv.setTextColor(TFT_DARKGREY); cv.setCursor(40,SCREEN_H/2-12); cv.print("No Fix"); return; }
+  if (!gps.hasReliableFix()) { cv.setTextSize(2); cv.setTextColor(TFT_DARKGREY); cv.setCursor(40,SCREEN_H/2-12); cv.print("No Fix"); return; }
   float lat=gps.latitude(),lon=gps.longitude(); char buf[40]; int y=CONTENT_TOP+12;
   cv.setTextSize(1); cv.setTextColor(TFT_DARKGREY); cv.setCursor(4,y); cv.print("LAT"); y+=10;
   cv.setTextSize(2); cv.setTextColor(TFT_GREEN); snprintf(buf,sizeof(buf),"%.6f",lat); cv.setCursor(4,y); cv.print(buf); y+=18;

@@ -397,7 +397,7 @@ void FnTrip::_drawRecord() {
     y += 4;
 
     // ===== 第三段：当前GPS数据预览 =====
-    if (gps.hasFix()) {
+    if (gps.hasReliableFix()) {
       cv.setTextColor(UI_BRASS);
       cv.setCursor(4, y);
       snprintf(buf, sizeof(buf), "Lat: %.6f  Lon: %.6f",

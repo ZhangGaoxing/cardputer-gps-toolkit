@@ -144,7 +144,7 @@ void Fn3DGlobe::onUpdate(bool force) {
   _camAngle += 12.0f * dt;
   if (_camAngle >= 360.0f) _camAngle -= 360.0f;
 
-  bool hasLoc = gps.hasFix();
+  bool hasLoc = gps.hasReliableFix();
   float centerLon = hasLoc ? gps.longitude() : 0;
   float centerLat = hasLoc ? gps.latitude() : 20.0f;
   float camLonDeg = centerLon + _camAngle;

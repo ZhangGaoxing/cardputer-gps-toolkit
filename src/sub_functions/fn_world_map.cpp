@@ -388,9 +388,9 @@ void FnWorldMap::drawMap(bool force) {
     return;
   }
 
-  float cLat = gps.hasFix() ? gps.latitude() : 0;
-  float cLon = gps.hasFix() ? gps.longitude() : 0;
-  bool hasFix = gps.hasFix();
+  bool hasFix = gps.hasReliableFix();
+  float cLat = hasFix ? gps.latitude() : 0;
+  float cLon = hasFix ? gps.longitude() : 0;
 
   static const float zoomLon[] = {360, 180, 90, 45, 22.5, 11.25};
   static const float zoomLat[] = {180, 90, 45, 22.5, 11.25, 5.625};

@@ -61,7 +61,7 @@ void FnWaypoint::onUpdate(bool force) {
   }
 
   // === 导航模式 ===
-  if (!gps.hasFix()) {
+  if (!gps.hasReliableFix()) {
     cv.setTextColor(TFT_RED);
     cv.setCursor(60, CONTENT_TOP + 55);
     cv.print("No GPS fix");

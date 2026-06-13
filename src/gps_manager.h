@@ -39,8 +39,12 @@ public:
   /** 每帧调用：读取串口，解析NMEA，更新卫星数据 */
   void update();
 
-  /** 是否获取到有效定位 */
-  bool hasFix() { return _gps.location.isValid(); }
+  /** 是否有当前新鲜定位（兼容旧调用语义） */
+  bool hasFix() const;
+  bool hasFreshFix() const;
+  bool hasReliableFix() const;
+  uint32_t fixAgeMs() const;
+  bool hasRecentGnssData() const;
 
   // 标准GPS数据存取器（非const，因为TinyGPSPlus内部会更新状态）
   float latitude()          { return (float)_gps.location.lat(); }
@@ -48,7 +52,7 @@ public:
   float altitude()          { return _gps.altitude.isValid() ? (float)_gps.altitude.meters() : 0.0f; }
   float speedKmph()         { return (float)_gps.speed.kmph(); }
   float courseDeg()         { return (float)_gps.course.deg(); }
-  int   satellitesUsed()    { return _gps.satellites.isValid() ? (int)_gps.satellites.value() : 0; }
+  int   satellitesUsed() const;
 
   // UTC时间和日期
   int utcHour()             { return (int)_gps.time.hour(); }
@@ -61,11 +65,19 @@ public:
   bool dateValid()          { return _gps.date.isValid(); }
 
   // 定位质量数据
-  int ggaFixQuality() const { return _ggaFixQuality; }
-  int gsaFixMode() const    { return _gsaFixMode; }
-  float pdop() const        { return _pdop; }
-  float vdop() const        { return _vdop; }
-  float hdop()              { return (float)_gps.hdop.hdop(); }
+  int fixQuality() const    {
+    return (_lastGgaMillis != 0 && millis() - _lastGgaMillis <= GPS_FIX_MAX_AGE_MS)
+           ? _ggaFixQuality : 0;
+  }
+  int fixMode() const       {
+    return (_lastGsaMillis != 0 && millis() - _lastGsaMillis <= GPS_FIX_MAX_AGE_MS)
+           ? _gsaFixMode : 1;
+  }
+  int ggaFixQuality() const { return fixQuality(); }
+  int gsaFixMode() const    { return fixMode(); }
+  float pdop() const;
+  float vdop() const;
+  float hdop() const;
   float geoidHeight() const { return _geoidHeight; }
   bool geoidValid() const   { return _geoidValid; }
 
@@ -98,11 +110,15 @@ private:
   void _markUsedSatellite(const String& preferredSystem, int id);
   GSVSequenceState* _getGSVState(const String& system);
   void _storeSatellite(const SatData& sat);
+  bool _hasRecentParsedNmea() const;
+  void _updateGpsState();
 
   HardwareSerial _serial{2};
   TinyGPSPlus _gps;
   GPSState _gpsState = GPS_ON;
   unsigned long _lastValidGpsMillis = 0;
+  unsigned long _lastNmeaMillis = 0;
+  unsigned long _lastGgaMillis = 0;
 
   // 卫星数据
   std::vector<SatData> _satellites;
