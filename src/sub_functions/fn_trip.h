@@ -13,7 +13,7 @@ public:
   void onExit() override;
   void drawIcon(int x, int y, int size, uint16_t color) override;
 private:
-  int _subTab = 0;  // 0=Stats, 1=Track, 2=Alt, 3=Speed, 4=Record
+  int _subTab = 0;  // 0=Stats, 1=Record, 2=Track, 3=Alt, 4=Speed
   void _drawStats();
   void _drawTrack();
   void _drawAlt();

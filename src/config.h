@@ -38,6 +38,10 @@
 //  轨迹记录参数
 // ==================================================================
 #define TRACK_MAX    120   // 轨迹点环形缓冲区大小
+#define GPX_TRACK_DIR              PATH_BASE
+#define GPX_RECOVERY_ENABLED       1
+#define GPX_FLUSH_INTERVAL_MS      5000
+#define GPX_FLUSH_EVERY_N_POINTS   3
 
 // ==================================================================
 //  NMEA 监视器参数
@@ -54,6 +58,18 @@
 #define GPS_NMEA_MAX_AGE_MS      3000
 #define GPS_RELIABLE_HDOP_MAX    8.0f
 #define GPS_MIN_SATELLITES_USED  4
+
+// TripTracker filtering thresholds
+#define TRACK_MIN_SAMPLE_INTERVAL_MS 1000
+#define TRACK_MIN_VALID_MOVE_M       2.5f
+#define TRACK_MAX_REASONABLE_SPEED_KMPH 160.0f
+#define TRACK_MAX_HDOP               6.0f
+#define TRACK_MIN_SATELLITES         4
+#define TRACK_MAX_LOCATION_AGE_MS    3000
+#define TRACK_FIX_GAP_BREAK_MS       5000
+#define TRACK_MAX_ALT_JUMP_M         25.0f
+#define TRACK_STATIONARY_SPEED_KMPH  1.0f
+#define TRACK_STATIONARY_DRIFT_M     6.0f
 
 // ==================================================================
 //  离线地图参数

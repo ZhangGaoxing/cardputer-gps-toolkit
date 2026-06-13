@@ -114,7 +114,7 @@ void FnGpsDashboard::_drawTabFix() {
   GPSManager& gps = GPSManager::instance();
   IMUManager& imu = IMUManager::instance();
 
-  cv.setTextSize(1); int y = CONTENT_TOP + 10; int lh = 12; char buf[40];
+  cv.setTextSize(1); int y = CONTENT_TOP + 12; int lh = 12; char buf[40];
 
   cv.setTextColor(gps.hasReliableFix() ? TFT_GREEN : (gps.hasFreshFix() ? TFT_YELLOW : TFT_LIGHTGREY));
   cv.setCursor(4,y); snprintf(buf,sizeof(buf),"Status:      %s",gpsStatusText(gps, false)); cv.print(buf); y+=lh;

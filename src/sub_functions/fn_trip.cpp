@@ -1,6 +1,5 @@
 /**
- * fn_trip.cpp — 行程（Stats + Track + Record 五合一，Tab 切换）
- * 合并自 fn_trip_stats.cpp + fn_trip_track.cpp
+ * fn_trip.cpp 鈥?琛岀▼锛圫tats + Track + Record 浜斿悎涓€锛孴ab 鍒囨崲锛? * 鍚堝苟鑷?fn_trip_stats.cpp + fn_trip_track.cpp
  */
 #include "fn_trip.h"
 #include "../display_manager.h"
@@ -19,8 +18,8 @@ static void formatDuration(uint32_t ms, char* buf, int bufSize) {
 
 void FnTrip::onEnter() { _subTab = 0; }
 void FnTrip::onExit() {
-  // 退出Trip页面不停止录制 — 录制由GpxWriter独立管理
-  // 用户需要在Record标签页手动停止
+  // 閫€鍑篢rip椤甸潰涓嶅仠姝㈠綍鍒?鈥?褰曞埗鐢盙pxWriter鐙珛绠＄悊
+  // 鐢ㄦ埛闇€瑕佸湪Record鏍囩椤垫墜鍔ㄥ仠姝?}
 }
 
 void FnTrip::onUpdate(bool force) {
@@ -28,7 +27,7 @@ void FnTrip::onUpdate(bool force) {
   M5Canvas& cv = DisplayManager::instance().canvas();
   cv.setTextSize(1);
   cv.setTextColor(TFT_DARKGREY);
-  const char* tabNames[] = {"Stats", "Track", "Alt", "Speed", "Record"};
+  const char* tabNames[] = {"Stats", "Record", "Track", "Alt", "Speed"};
   cv.setCursor(4, 2);
   cv.print(tabNames[_subTab]);
   cv.setCursor(SCREEN_W - 40, 2);
@@ -36,30 +35,28 @@ void FnTrip::onUpdate(bool force) {
 
   switch (_subTab) {
     case 0: _drawStats(); break;
-    case 1: _drawTrack(); break;
-    case 2: _drawAlt();   break;
-    case 3: _drawSpeed(); break;
-    case 4: _drawRecord(); break;
+    case 1: _drawRecord(); break;
+    case 2: _drawTrack();  break;
+    case 3: _drawAlt();    break;
+    case 4: _drawSpeed();  break;
   }
 }
 
 bool FnTrip::onKeyEvent(const KeyEvent& event) {
   if (event.pressed && event.key == 0x09) { _subTab = (_subTab + 1) % 5; return true; }
-  // Enter/Space键在Record标签页中控制录制启停
-  if (event.pressed && (event.key == 0x0D || event.key == ' ') && _subTab == 4) {
+  // Enter/Space閿湪Record鏍囩椤典腑鎺у埗褰曞埗鍚仠
+  if (event.pressed && (event.key == 0x0D || event.key == ' ') && _subTab == 1) {
     GpxWriter& gw = GpxWriter::instance();
     if (gw.isRecording()) {
       gw.stopRecording();
     } else {
       auto& gps = GPSManager::instance();
-      // 必须有有效的GPS日期和时间才能开始录制（文件名依赖UTC时间）
       if (!gps.dateValid() || !gps.timeValid() || gps.utcYear() < 2020) {
-        // GPS时间无效 — 静默拒绝，界面已显示"Need valid GPS date/time"
         return true;
       }
-      gw.begin();  // 确保SD卡就绪
+      gw.begin();
       gw.startRecording(gps.utcYear(), gps.utcMonth(), gps.utcDay(),
-                        gps.utcHour(), gps.utcMinute());
+                        gps.utcHour(), gps.utcMinute(), gps.utcSecond());
     }
     return true;
   }
@@ -67,7 +64,7 @@ bool FnTrip::onKeyEvent(const KeyEvent& event) {
 }
 
 // ============================================================
-//  Tab 0 — 行程统计
+//  Tab 0 鈥?琛岀▼缁熻
 // ============================================================
 void FnTrip::_drawStats() {
   M5Canvas& cv = DisplayManager::instance().canvas();
@@ -78,7 +75,7 @@ void FnTrip::_drawStats() {
   cv.setTextSize(1);
   int y = 14;  // below tab header
   int lh = 14;
-  char buf[40];
+  char buf[48];
 
   if (!ts.hasPrev) {
     cv.setTextColor(TFT_DARKGREY);
@@ -112,7 +109,7 @@ void FnTrip::_drawStats() {
   cv.print(buf); y += lh;
 
   cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "Max Speed: %.1f km/h", ts.maxSpeedKmph);
+  snprintf(buf, sizeof(buf), "Speed: %.1f / %.1f km/h", ts.currentSpeedKmph, ts.maxSpeedKmph);
   cv.print(buf); y += lh;
 
   cv.setTextColor(TFT_CYAN);
@@ -125,7 +122,8 @@ void FnTrip::_drawStats() {
   cv.print(buf); y += lh;
 
   cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "Alt Range: %.0f - %.0f m", ts.minAltM, ts.maxAltM);
+  snprintf(buf, sizeof(buf), "Alt: %.0f-%.0fm  Rej:%lu", ts.minAltM, ts.maxAltM,
+           (unsigned long)ts.rejectedPoints);
   cv.print(buf); y += lh;
 
   if (imu.isAvailable()) {
@@ -137,13 +135,11 @@ void FnTrip::_drawStats() {
 }
 
 // ============================================================
-//  Tab 1 — 轨迹面包屑
-// ============================================================
+//  Tab 1 鈥?杞ㄨ抗闈㈠寘灞?// ============================================================
 void FnTrip::_drawTrack() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   TripTracker& trk = TripTracker::instance();
-  int cnt = trk.pointCount();
-  const TrackPoint* buf = trk.points();
+  int cnt = (int)trk.pointCount();
 
   const int margin = 4;
   int mapX = margin, mapY = 14, mapW = SCREEN_W - margin * 2, mapH = SCREEN_H - mapY - margin;
@@ -154,16 +150,17 @@ void FnTrip::_drawTrack() {
     return;
   }
 
-  int lastRaw = cnt - 1;
-  float cLat = buf[lastRaw].lat;
-  float cLon = buf[lastRaw].lon;
+  TrackPoint cur = trk.pointAt(cnt - 1);
+  float cLat = cur.lat;
+  float cLon = cur.lon;
   float cosLat = cos(radians(cLat));
 
   float px[TRACK_MAX], py[TRACK_MAX];
   float maxDist = 1.0;
   for (int i = 0; i < cnt; i++) {
-    px[i] = (buf[i].lon - cLon) * cosLat * 111320.0;
-    py[i] = (buf[i].lat - cLat) * 111320.0;
+    TrackPoint p = trk.pointAt(i);
+    px[i] = (p.lon - cLon) * cosLat * 111320.0;
+    py[i] = (p.lat - cLat) * 111320.0;
     float d = max(fabs(px[i]), fabs(py[i]));
     if (d > maxDist) maxDist = d;
   }
@@ -179,6 +176,7 @@ void FnTrip::_drawTrack() {
     int sy1 = mcy - (int)(py[i - 1] * scale);
     int sx2 = mcx + (int)(px[i] * scale);
     int sy2 = mcy - (int)(py[i] * scale);
+    if (trk.pointAt(i).segmentStart) continue;
     sx1 = constrain(sx1, mapX + 1, mapX + mapW - 2);
     sy1 = constrain(sy1, mapY + 1, mapY + mapH - 2);
     sx2 = constrain(sx2, mapX + 1, mapX + mapW - 2);
@@ -190,15 +188,12 @@ void FnTrip::_drawTrack() {
 }
 
 // ============================================================
-//  Tab 2 — 海拔剖面图
-// ============================================================
+//  Tab 2 鈥?娴锋嫈鍓栭潰鍥?// ============================================================
 void FnTrip::_drawAlt() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   TripTracker& trk = TripTracker::instance();
-  int cnt = trk.pointCount();
-  const TrackPoint* buf = trk.points();
+  int cnt = (int)trk.pointCount();
 
-  // y轴贴近文本：gx=24, 左侧文本2px处; x轴上方留空给时间标签：gy=14, 底部留空=14px给时间
   int gx = 24, gy = 14, gw = SCREEN_W - gx - 4, gh = SCREEN_H - gy - 14;
 
   if (cnt < 2) {
@@ -209,7 +204,7 @@ void FnTrip::_drawAlt() {
 
   float vals[TRACK_MAX];
   float minV = 99999, maxV = -99999, curV = 0;
-  for (int i = 0; i < cnt; i++) { vals[i] = buf[i].altM;
+  for (int i = 0; i < cnt; i++) { vals[i] = trk.pointAt(i).altM;
     if (vals[i] < minV) minV = vals[i];
     if (vals[i] > maxV) maxV = vals[i]; }
   curV = vals[cnt - 1];
@@ -239,16 +234,15 @@ void FnTrip::_drawAlt() {
   cv.setCursor(gx + 40, gy - 4);
   cv.print("Alt(m)");
 
-  // X-axis 真实时间，2分钟间隔
+  // X-axis 鐪熷疄鏃堕棿锛?鍒嗛挓闂撮殧
   if (cnt >= 2) {
     cv.setTextColor(TFT_DARKGREY); cv.setTextSize(1);
-    unsigned long t0 = buf[0].timestamp;
-    unsigned long t1 = buf[cnt - 1].timestamp;
+    unsigned long t0 = trk.pointAt(0).timestamp;
+    unsigned long t1 = trk.pointAt(cnt - 1).timestamp;
     unsigned long duration = (t1 > t0) ? (t1 - t0) : 60000;
-    // 每2分钟一个标签
     unsigned long interval = 120000;
     if (duration < interval * 2) interval = duration / 3;
-    if (interval < 30000) interval = 30000; // 最少30秒间隔
+    if (interval < 30000) interval = 30000;
     for (unsigned long t = (t0 / interval) * interval; t <= t1; t += interval) {
       float frac = (float)(t - t0) / (float)duration;
       int tx = gx + (int)(frac * gw);
@@ -263,15 +257,12 @@ void FnTrip::_drawAlt() {
 }
 
 // ============================================================
-//  Tab 3 — 速度曲线图
-// ============================================================
+//  Tab 3 鈥?閫熷害鏇茬嚎鍥?// ============================================================
 void FnTrip::_drawSpeed() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   TripTracker& trk = TripTracker::instance();
-  int cnt = trk.pointCount();
-  const TrackPoint* buf = trk.points();
+  int cnt = (int)trk.pointCount();
 
-  // y轴贴近文本：gx=24, 左侧文本2px处; x轴上方留空给时间标签：gy=14, 底部留空=14px给时间
   int gx = 24, gy = 14, gw = SCREEN_W - gx - 4, gh = SCREEN_H - gy - 14;
 
   if (cnt < 2) {
@@ -282,7 +273,7 @@ void FnTrip::_drawSpeed() {
 
   float vals[TRACK_MAX];
   float minV = 99999, maxV = -99999, curV = 0, sumV = 0;
-  for (int i = 0; i < cnt; i++) { vals[i] = buf[i].speedKmph;
+  for (int i = 0; i < cnt; i++) { vals[i] = trk.pointAt(i).speedKmph;
     if (vals[i] < minV) minV = vals[i];
     if (vals[i] > maxV) maxV = vals[i];
     sumV += vals[i]; }
@@ -315,11 +306,11 @@ void FnTrip::_drawSpeed() {
   cv.setCursor(gx + gw - 70, gy - 4);
   cv.printf("Now:%.1f", curV);
 
-  // X-axis 真实时间，2分钟间隔
+  // X-axis 鐪熷疄鏃堕棿锛?鍒嗛挓闂撮殧
   if (cnt >= 2) {
     cv.setTextColor(TFT_DARKGREY); cv.setTextSize(1);
-    unsigned long t0 = buf[0].timestamp;
-    unsigned long t1 = buf[cnt - 1].timestamp;
+    unsigned long t0 = trk.pointAt(0).timestamp;
+    unsigned long t1 = trk.pointAt(cnt - 1).timestamp;
     unsigned long duration = (t1 > t0) ? (t1 - t0) : 60000;
     unsigned long interval = 120000;
     if (duration < interval * 2) interval = duration / 3;
@@ -338,7 +329,7 @@ void FnTrip::_drawSpeed() {
 }
 
 // ============================================================
-//  Tab 4 — GPX 轨迹录制
+//  Tab 4 鈥?GPX 杞ㄨ抗褰曞埗
 // ============================================================
 void FnTrip::_drawRecord() {
   M5Canvas& cv = DisplayManager::instance().canvas();
@@ -347,118 +338,121 @@ void FnTrip::_drawRecord() {
 
   cv.setTextSize(1);
   int y = 14;
-  int lh = 15;
-  char buf[64];
+  const int lh = 12;
+  char buf[72];
 
   bool recording = gw.isRecording();
   bool sdOk = gw.sdReady();
   bool gpsOk = gps.dateValid() && gps.timeValid();
+  const char* gpxError = gw.lastError();
+  bool showGpxError = gpxError[0] != '\0';
+  if (!sdOk &&
+      (strcmp(gpxError, "SD init failed") == 0 ||
+       strcmp(gpxError, "Cannot create GPX directory") == 0)) {
+    showGpxError = false;
+  }
 
-  // ===== 第一段：状态概览 =====
   cv.setTextColor(TFT_WHITE);
   cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "Recording: %s", recording ? "ON" : "OFF");
+  snprintf(buf, sizeof(buf), "REC:%s  SD:%s  GPS:%s",
+           recording ? "ON" : "OFF",
+           sdOk ? "OK" : "NO",
+           gpsOk ? "TIME" : "WAIT");
   cv.print(buf); y += lh;
 
-  cv.setTextColor(sdOk ? TFT_GREEN : TFT_RED);
-  cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "SD Card:  %s", sdOk ? "Ready" : "No Card");
-  cv.print(buf); y += lh;
+  if (showGpxError) {
+    cv.setTextColor(TFT_RED);
+    cv.setCursor(4, y);
+    snprintf(buf, sizeof(buf), "GPX: %.32s", gpxError);
+    cv.print(buf); y += lh;
+  }
 
-  cv.setTextColor(gpsOk ? TFT_GREEN : TFT_YELLOW);
-  cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "GPS Time: %s", gpsOk ? "Valid" : "Waiting...");
-  cv.print(buf); y += lh;
-
-  y += 4;
-
-  // ===== 第二段：录制中显示详情 =====
   if (recording) {
     cv.setTextColor(TFT_CYAN);
     cv.setCursor(4, y);
-    snprintf(buf, sizeof(buf), "File: %s", gw.currentFileName());
+    snprintf(buf, sizeof(buf), "File: %.34s", gw.currentFileName());
     cv.print(buf); y += lh;
 
-    cv.setTextColor(TFT_WHITE);
-    cv.setCursor(4, y);
-    snprintf(buf, sizeof(buf), "Points: %d", gw.pointCount());
-    cv.print(buf); y += lh;
-
-    // 录制时长
     unsigned long elapsed = millis() - gw.recordingStartMs();
     int elSec = elapsed / 1000;
     int elMin = elSec / 60;
     int elHr = elMin / 60;
+    cv.setTextColor(TFT_WHITE);
     cv.setCursor(4, y);
-    snprintf(buf, sizeof(buf), "Duration: %02d:%02d:%02d",
-             elHr, elMin % 60, elSec % 60);
+    snprintf(buf, sizeof(buf), "Pts:%d  Dur:%02d:%02d:%02d",
+             gw.pointCount(), elHr, elMin % 60, elSec % 60);
     cv.print(buf); y += lh;
 
-    y += 4;
-
-    // ===== 第三段：当前GPS数据预览 =====
     if (gps.hasReliableFix()) {
       cv.setTextColor(UI_BRASS);
       cv.setCursor(4, y);
-      snprintf(buf, sizeof(buf), "Lat: %.6f  Lon: %.6f",
+      snprintf(buf, sizeof(buf), "Lat %.6f Lon %.6f",
                gps.latitude(), gps.longitude());
       cv.print(buf); y += lh;
 
       cv.setCursor(4, y);
-      snprintf(buf, sizeof(buf), "Alt: %.0fm  Spd: %.1fkm/h",
-               gps.altitude(), gps.speedKmph());
+      snprintf(buf, sizeof(buf), "Alt %.0fm Spd %.1f Sat %d",
+               gps.altitude(), gps.speedKmph(), gps.satellitesUsed());
+      cv.print(buf); y += lh;
+
+      cv.setCursor(4, y);
+      snprintf(buf, sizeof(buf), "HDOP %.1f Fix %s",
+               gps.hdop(), gps.fixMode() == 3 ? "3D" : "2D");
       cv.print(buf); y += lh;
     } else {
       cv.setTextColor(TFT_DARKGREY);
       cv.setCursor(4, y);
       cv.print("Waiting for GPS fix...");
       y += lh;
+
+      uint32_t ageMs = gps.fixAgeMs();
+      cv.setCursor(4, y);
+      if (ageMs == UINT32_MAX) {
+        snprintf(buf, sizeof(buf), "HDOP %.1f Sat %d Age --",
+                 gps.hdop(), gps.satellitesUsed());
+      } else {
+        snprintf(buf, sizeof(buf), "HDOP %.1f Sat %d Age %lus",
+                 gps.hdop(), gps.satellitesUsed(),
+                 (unsigned long)(ageMs / 1000));
+      }
+      cv.print(buf); y += lh;
     }
 
-    y += 4;
-
-    // ===== 第四段：停止提示 =====
     cv.setTextColor(TFT_GREENYELLOW);
     cv.setCursor(4, y);
     cv.print("[Enter] Stop Recording");
   } else {
-    // ===== 未录制时的起始提示 =====
-    y += 4;
-
     if (gpsOk) {
       cv.setTextColor(UI_BRASS);
       cv.setCursor(4, y);
-      snprintf(buf, sizeof(buf), "UTC: %04d-%02d-%02d %02d:%02d:%02d",
+      snprintf(buf, sizeof(buf), "UTC %04d-%02d-%02d %02d:%02d:%02d",
                gps.utcYear(), gps.utcMonth(), gps.utcDay(),
                gps.utcHour(), gps.utcMinute(), gps.utcSecond());
       cv.print(buf); y += lh;
 
       cv.setCursor(4, y);
-      snprintf(buf, sizeof(buf), "File: Trip_%04d%02d%02d_%02d%02d.gpx",
+      snprintf(buf, sizeof(buf), "Next track_%04d%02d%02d_%02d%02d%02d",
                gps.utcYear(), gps.utcMonth(), gps.utcDay(),
-               gps.utcHour(), gps.utcMinute());
+               gps.utcHour(), gps.utcMinute(), gps.utcSecond());
       cv.print(buf); y += lh;
     }
 
-    y += 4;
-
-    cv.setTextColor(TFT_GREEN);
-    cv.setCursor(4, y);
-    cv.print("[Enter] Start Recording");
-
     if (!sdOk) {
-      y += lh;
       cv.setTextColor(TFT_RED);
       cv.setCursor(4, y);
-      cv.print("SD card required!");
-    } else if (!gpsOk) {
+      cv.print("Insert SD card to record");
       y += lh;
+    } else if (!gpsOk) {
       cv.setTextColor(TFT_YELLOW);
       cv.setCursor(4, y);
       cv.print("Need valid GPS date/time");
+      y += lh;
     }
-  }
 
+    cv.setTextColor(sdOk && gpsOk ? TFT_GREEN : TFT_DARKGREY);
+    cv.setCursor(4, y);
+    cv.print("[Enter] Start Recording");
+  }
 }
 
 void FnTrip::drawIcon(int x, int y, int size, uint16_t color) {
