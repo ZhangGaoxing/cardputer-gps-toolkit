@@ -106,11 +106,11 @@ pio device monitor -b 115200
 
 ## World Map Vector Data
 
-World Map keeps all Natural Earth vector resources on the SD card. Copy the contents of `vector_bin/` to `/gpsmap/vector/`:
+World Map keeps all Natural Earth vector resources on the SD card. Copy the contents of `vector_bin/` to `/gpstoolkit/vector/`:
 
 ```
 SD Card:
-└── gpsmap/
+└── gpstoolkit/
     └── vector/
         ├── coast.bin / coast.idx
         ├── border.bin / border.idx
@@ -122,7 +122,7 @@ SD Card:
         └── cities.bin
 ```
 
-The firmware also accepts `/gpsmap/*.bin` and `/vector_bin/*.bin` as fallback locations. `coast.bin` or `border.bin` is enough for the map to open. `cities.bin` enables city dots and labels, and `.idx` files keep zoom/redraw fast by letting the firmware skip off-screen vector segments. If you regenerate any `.bin` file, run `tools/build_vector_indexes.py vector_bin` and copy the updated `.idx` files to the SD card too.
+The firmware also accepts `/gpstoolkit/*.bin` and `/vector_bin/*.bin` as fallback locations. `coast.bin` or `border.bin` is enough for the map to open. `cities.bin` enables city dots and labels, and `.idx` files keep zoom/redraw fast by letting the firmware skip off-screen vector segments. If you regenerate any `.bin` file, run `tools/build_vector_indexes.py vector_bin` and copy the updated `.idx` files to the SD card too.
 
 ## Offline Map Preparation
 
@@ -130,8 +130,8 @@ The offline map feature uses SD card stored OpenStreetMap tiles. File structure:
 
 ```
 SD Card:
-└── gpsmap/
-    ├── gpsmap.ini            ← auto-saved last position
+└── gpstoolkit/
+    ├── gpstoolkit.ini        ← auto-saved last position
     ├── screenshot/           ← screenshot directory
     │   └── shot_0000.bmp
     └── {z}/                  ← zoom level (6-18)
@@ -141,20 +141,29 @@ SD Card:
 
 ### Generate Map Tiles
 
-Use the Python tools in `GPSMap/maptools/`:
+Use the Python tools in `tools/`:
 
 ```bash
 # Install dependencies
 pip install protobuf grpcio-tools numpy Pillow
+# Optional lightweight converter dependency
+pip install osmium
 
 # Download OpenStreetMap data (.osm.pbf file)
+python tools/map_download.py --region asia/china -o tools
+
 # Generate tiles with the conversion tool
-python osm2tile.py input.osm.pbf -z 10-13 -b S,W,N,E
+python tools/tile_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+
+# Both scripts can also run interactively
+python tools/map_download.py
+python tools/tile_convert.py
 ```
 
 Parameters:
 - `-z 10-13`: generate tiles for zoom levels 10 through 13
 - `-b S,W,N,E`: bounding box (lat South, lon West, lat North, lon East)
+- `--engine small`: use the lightweight converter for small extracts
 - Interactive mode also supported (press Enter to use default zoom 10-12)
 
 > **Note**: Global map requires massive RAM (100+ GB). Convert only the region you need. Zoom 12 is sufficient for daily use.

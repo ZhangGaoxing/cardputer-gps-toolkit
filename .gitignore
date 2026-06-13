@@ -64,8 +64,10 @@ vcpkg_installed/
 # debug information files
 *.dwo
 
+*.pyc
+
 # test output & cache
 Testing/
 .cache/
-
+.vscode/
 .pio/

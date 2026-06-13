@@ -1,6 +1,6 @@
 /**
  * fn_3d_globe.cpp — 3D旋转地球 + 卫星轨道可视化（从 SD 卡读取低分辨率矢量数据）
- * 数据由 convert_geodata.py 生成，存储在 SD 卡 /gpsmap/vector/coast_low.bin
+ * 数据由 convert_geodata.py 生成，存储在 SD 卡 /gpstoolkit/vector/coast_low.bin
  */
 #include "fn_3d_globe.h"
 #include "../display_manager.h"
@@ -133,7 +133,7 @@ void Fn3DGlobe::onUpdate(bool force) {
     cv.print("SD Card not available");
     cv.setTextColor(TFT_DARKGREY);
     cv.setCursor(8, CONTENT_TOP + CONTENT_H / 2 + 6);
-    cv.print("Insert SD with /gpsmap/vector data");
+    cv.print("Insert SD with /gpstoolkit/vector data");
     return;
   }
 

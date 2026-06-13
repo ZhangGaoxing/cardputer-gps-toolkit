@@ -1,7 +1,7 @@
 /**
  * fn_world_map.cpp - Vector world map loaded from SD card.
  *
- * Vector data lives under /gpsmap/vector on the SD card. The .bin files keep
+ * Vector data lives under /gpstoolkit/vector on the SD card. The .bin files keep
  * the original Cardputer-Adv-GPS-Info coordinate stream, while .idx files add
  * per-segment bbox/offset records so zoomed views do not need to scan megabytes
  * of off-screen geometry.
@@ -382,7 +382,7 @@ void FnWorldMap::drawMap(bool force) {
     cv.print(_errorMsg ? _errorMsg : "World map unavailable");
     cv.setTextColor(TFT_DARKGREY);
     cv.setCursor(6, SCREEN_H / 2 - 2);
-    cv.print("Copy /gpsmap/vector to SD");
+    cv.print("Copy /gpstoolkit/vector to SD");
     cv.setCursor(6, SCREEN_H / 2 + 10);
     cv.print("Need coast.bin or border.bin");
     return;
@@ -473,7 +473,7 @@ void FnWorldMap::drawMap(bool force) {
   cv.setTextSize(1);
   cv.setTextColor(TFT_DARKGREY);
   char zBuf[24];
-  snprintf(zBuf, sizeof(zBuf), "z%d [z+/x-] [`]back", z);
+  snprintf(zBuf, sizeof(zBuf), "z%d [z+/x-]", z);
   cv.setCursor(2, SCREEN_H - 10);
   cv.print(zBuf);
 

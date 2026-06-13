@@ -63,28 +63,28 @@
 #define DIR_REPEAT_MS 200
 
 // SD 卡地图文件路径
-#define PATH_BASE        "/gpsmap"
-#define PATH_INI         "/gpsmap/gpsmap.ini"
-#define PATH_SHOT_DIR    "/gpsmap/screenshot"
+#define PATH_BASE        "/gpstoolkit"
+#define PATH_INI         "/gpstoolkit/gpstoolkit.ini"
+#define PATH_SHOT_DIR    "/gpstoolkit/screenshot"
 
 // 矢量地图数据文件（从 map_data.h 的 PROGMEM 数据迁移至 SD 卡）
-#define PATH_VECTOR_DIR     "/gpsmap/vector"
-#define PATH_COAST_BIN      "/gpsmap/vector/coast.bin"
-#define PATH_BORDER_BIN     "/gpsmap/vector/border.bin"
-#define PATH_STATE_BIN      "/gpsmap/vector/state.bin"
-#define PATH_RIVER_BIN      "/gpsmap/vector/river.bin"
-#define PATH_LAKE_BIN       "/gpsmap/vector/lake.bin"
-#define PATH_CITIES_BIN     "/gpsmap/vector/cities.bin"
-#define PATH_COAST_LOW_BIN  "/gpsmap/vector/coast_low.bin"
-#define PATH_BORDER_LOW_BIN "/gpsmap/vector/border_low.bin"
+#define PATH_VECTOR_DIR     "/gpstoolkit/vector"
+#define PATH_COAST_BIN      "/gpstoolkit/vector/coast.bin"
+#define PATH_BORDER_BIN     "/gpstoolkit/vector/border.bin"
+#define PATH_STATE_BIN      "/gpstoolkit/vector/state.bin"
+#define PATH_RIVER_BIN      "/gpstoolkit/vector/river.bin"
+#define PATH_LAKE_BIN       "/gpstoolkit/vector/lake.bin"
+#define PATH_CITIES_BIN     "/gpstoolkit/vector/cities.bin"
+#define PATH_COAST_LOW_BIN  "/gpstoolkit/vector/coast_low.bin"
+#define PATH_BORDER_LOW_BIN "/gpstoolkit/vector/border_low.bin"
 
-#define PATH_COAST_IDX      "/gpsmap/vector/coast.idx"
-#define PATH_BORDER_IDX     "/gpsmap/vector/border.idx"
-#define PATH_STATE_IDX      "/gpsmap/vector/state.idx"
-#define PATH_RIVER_IDX      "/gpsmap/vector/river.idx"
-#define PATH_LAKE_IDX       "/gpsmap/vector/lake.idx"
-#define PATH_COAST_LOW_IDX  "/gpsmap/vector/coast_low.idx"
-#define PATH_BORDER_LOW_IDX "/gpsmap/vector/border_low.idx"
+#define PATH_COAST_IDX      "/gpstoolkit/vector/coast.idx"
+#define PATH_BORDER_IDX     "/gpstoolkit/vector/border.idx"
+#define PATH_STATE_IDX      "/gpstoolkit/vector/state.idx"
+#define PATH_RIVER_IDX      "/gpstoolkit/vector/river.idx"
+#define PATH_LAKE_IDX       "/gpstoolkit/vector/lake.idx"
+#define PATH_COAST_LOW_IDX  "/gpstoolkit/vector/coast_low.idx"
+#define PATH_BORDER_LOW_IDX "/gpstoolkit/vector/border_low.idx"
 
 // 坐标缩放因子（度 * 100 存储为 int16_t）
 #define COORD_SCALE 100

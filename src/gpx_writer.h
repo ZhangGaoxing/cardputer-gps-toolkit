@@ -82,7 +82,7 @@ private:
   bool _recording = false;
   File _file;
   char _fileName[32];          // e.g. "Trip_20260609_0830.gpx"
-  char _filePath[48];          // e.g. "/gpsmap/Trip_20260609_0830.gpx"
+  char _filePath[48];          // e.g. "/gpstoolkit/Trip_20260609_0830.gpx"
   int _pointCount = 0;
   unsigned long _recordingStartMs = 0;
 };

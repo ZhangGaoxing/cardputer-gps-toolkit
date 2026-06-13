@@ -12,9 +12,16 @@ public:
   bool onKeyEvent(const KeyEvent& event) override;
   void drawIcon(int x, int y, int size, uint16_t color) override;
 private:
+  void _centerOnGps();
+  void _panByPixels(int dx, int dy);
+  void _zoomBy(int delta);
   double _lat = 0, _lon = 0;
+  double _gpsLat = 0, _gpsLon = 0;
   int _zoom = ZOOM_DEFAULT;
   bool _sdReady = false;
-  int _panX = 0, _panY = 0;
+  bool _hasPosition = false;
+  bool _hasGpsPosition = false;
+  bool _centeredOnGps = false;
+  bool _userPanned = false;
 };
 #endif

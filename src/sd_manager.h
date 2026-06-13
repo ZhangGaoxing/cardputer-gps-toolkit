@@ -78,6 +78,8 @@ public:
   /** 加载并解码一个地图瓦片JPEG到画布上 */
   bool loadTile(int z, int x, int y, int screenX, int screenY);
 
+  int maxTileZoom();
+
   /** 保存上次GPS位置到INI文件 */
   void savePosition(double lat, double lon, int zoom);
 

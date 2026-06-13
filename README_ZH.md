@@ -106,11 +106,11 @@ pio device monitor -b 115200
 
 ## World Map 矢量数据
 
-World Map 的 Natural Earth 矢量资源全部保存在 SD 卡中。请将 `vector_bin/` 目录内容复制到 SD 卡的 `/gpsmap/vector/`：
+World Map 的 Natural Earth 矢量资源全部保存在 SD 卡中。请将 `vector_bin/` 目录内容复制到 SD 卡的 `/gpstoolkit/vector/`：
 
 ```
 SD卡:
-└── gpsmap/
+└── gpstoolkit/
     └── vector/
         ├── coast.bin / coast.idx
         ├── border.bin / border.idx
@@ -122,7 +122,7 @@ SD卡:
         └── cities.bin
 ```
 
-固件也兼容 `/gpsmap/*.bin` 和 `/vector_bin/*.bin` 作为备用路径。只要有 `coast.bin` 或 `border.bin`，地图就会打开；`cities.bin` 用于城市点和放大后的地名显示；`.idx` 文件用于按视口跳过屏幕外的矢量线段，显著加快加载和缩放。若重新生成任意 `.bin` 文件，请运行 `tools/build_vector_indexes.py vector_bin`，并把更新后的 `.idx` 一起复制到 SD 卡。
+固件也兼容 `/gpstoolkit/*.bin` 和 `/vector_bin/*.bin` 作为备用路径。只要有 `coast.bin` 或 `border.bin`，地图就会打开；`cities.bin` 用于城市点和放大后的地名显示；`.idx` 文件用于按视口跳过屏幕外的矢量线段，显著加快加载和缩放。若重新生成任意 `.bin` 文件，请运行 `tools/build_vector_indexes.py vector_bin`，并把更新后的 `.idx` 一起复制到 SD 卡。
 
 ## 离线地图准备
 
@@ -130,8 +130,8 @@ SD卡:
 
 ```
 SD卡:
-└── gpsmap/
-    ├── gpsmap.ini            ← 自动保存上次位置
+└── gpstoolkit/
+    ├── gpstoolkit.ini        ← 自动保存上次位置
     ├── screenshot/           ← 截图保存目录
     │   └── shot_0000.bmp
     └── {z}/                  ← 缩放级别 (6-18)
@@ -141,15 +141,21 @@ SD卡:
 
 ### 生成地图瓦片
 
-使用 `GPSMap/maptools/` 目录下的 Python 转换工具：
+使用 `tools/` 目录下的 Python 转换工具：
 
 ```bash
 # 安装依赖
 pip install protobuf grpcio-tools numpy Pillow
 
 # 下载 OpenStreetMap 数据（.osm.pbf 文件）
+python tools/map_download.py --region asia/china -o tools
+
 # 使用转换工具生成瓦片
-python osm2tile.py input.osm.pbf -z 10-13 -b S,W,N,E
+python tools/tile_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+
+# 两个脚本也支持直接运行后交互输入
+python tools/map_download.py
+python tools/tile_convert.py
 ```
 
 参数说明：

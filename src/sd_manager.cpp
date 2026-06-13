@@ -221,6 +221,46 @@ bool SDManager::loadTile(int z, int x, int y, int screenX, int screenY) {
   return true;
 }
 
+int SDManager::maxTileZoom() {
+  if (!_ready) return -1;
+
+  File dir = SD.open(PATH_BASE, FILE_READ);
+  if (!dir) return -1;
+
+  int maxZoom = -1;
+  while (true) {
+    File entry = dir.openNextFile();
+    if (!entry) break;
+
+    bool isDir = entry.isDirectory();
+    String name = entry.name();
+    entry.close();
+
+    if (!isDir) continue;
+
+    int lastSlash = name.lastIndexOf('/');
+    if (lastSlash >= 0) name = name.substring(lastSlash + 1);
+    if (name.length() == 0) continue;
+
+    bool allDigits = true;
+    for (size_t i = 0; i < name.length(); i++) {
+      if (name[i] < '0' || name[i] > '9') {
+        allDigits = false;
+        break;
+      }
+    }
+    if (!allDigits) continue;
+
+    int z = name.toInt();
+    if (z >= ZOOM_MIN && z <= ZOOM_MAX && z > maxZoom) {
+      maxZoom = z;
+    }
+  }
+
+  dir.close();
+  return maxZoom;
+}
+
 void SDManager::savePosition(double lat, double lon, int zoom) {
   if (!_ready) return;
   SD.mkdir(PATH_BASE);
