@@ -65,6 +65,18 @@ private:
   bool _fill();
 };
 
+enum TileLoadStatus {
+  TILE_LOAD_OK = 0,
+  TILE_LOAD_NOT_READY,
+  TILE_LOAD_NOT_FOUND,
+  TILE_LOAD_FILE_OPEN_ERROR,
+  TILE_LOAD_FILE_READ_ERROR,
+  TILE_LOAD_SIZE_INVALID,
+  TILE_LOAD_NO_MEMORY,
+  TILE_LOAD_DECODE_OPEN_FAILED,
+  TILE_LOAD_DECODE_FAILED
+};
+
 class SDManager {
 public:
   static SDManager& instance();
@@ -76,7 +88,7 @@ public:
   bool isReady() const { return _ready; }
 
   /** 加载并解码一个地图瓦片JPEG到画布上 */
-  bool loadTile(int z, int x, int y, int screenX, int screenY);
+  TileLoadStatus loadTile(int z, int x, int y, int screenX, int screenY);
 
   int maxTileZoom();
 
@@ -90,14 +102,42 @@ public:
   JPEGDEC& jpegDecoder() { return _jpeg; }
 
 private:
+  struct TileCacheEntry {
+    bool valid = false;
+    uint64_t key = 0;
+    size_t size = 0;
+    uint32_t lastUsed = 0;
+    uint8_t* data = nullptr;
+  };
+
+  struct NegativeTileCacheEntry {
+    bool valid = false;
+    uint64_t key = 0;
+    TileLoadStatus status = TILE_LOAD_NOT_FOUND;
+    uint32_t lastUsed = 0;
+  };
+
   SDManager() = default;
   SDManager(const SDManager&) = delete;
   SDManager& operator=(const SDManager&) = delete;
+
+  uint64_t _tileKey(int z, int x, int y) const;
+  TileCacheEntry* _findTileCache(uint64_t key);
+  TileCacheEntry* _selectTileCacheSlot();
+  bool _ensureTileBuffer(TileCacheEntry& entry);
+  NegativeTileCacheEntry* _findNegativeTileCache(uint64_t key);
+  void _rememberNegativeTile(uint64_t key, TileLoadStatus status);
+  void _clearNegativeTile(uint64_t key);
+  TileLoadStatus _decodeTileBuffer(const uint8_t* data, size_t size, int screenX, int screenY);
+  bool _shouldNegativeCache(TileLoadStatus status) const;
 
   bool _ready = false;
   bool _initAttempted = false;
   int _shotCounter = 0;
   JPEGDEC _jpeg;
+  uint32_t _tileUseCounter = 0;
+  TileCacheEntry _tileCache[MAP_TILE_CACHE_SIZE];
+  NegativeTileCacheEntry _negativeTileCache[MAP_NEGATIVE_CACHE_SIZE];
 };
 
 #endif

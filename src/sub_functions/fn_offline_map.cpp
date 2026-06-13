@@ -10,6 +10,8 @@
 #include <string.h>
 
 static const uint16_t MAP_BG_COLOR = 0xF77C;
+static const uint16_t MAP_TILE_PLACEHOLDER_COLOR = 0x8C51;
+static const uint16_t MAP_TILE_PLACEHOLDER_LINE = 0x5AEB;
 static const double WEB_MERCATOR_MAX_LAT = 85.05112878;
 static const double MAP_PI = 3.14159265358979323846;
 static const double DEG_TO_RAD_D = 0.017453292519943295;
@@ -57,53 +59,109 @@ static int wrapTileX(int x, int zoom) {
   return x;
 }
 
+static double wrappedPixelDelta(double nextPx, double prevPx, double worldPx) {
+  double delta = fabs(nextPx - prevPx);
+  if (delta > worldPx / 2.0) delta = worldPx - delta;
+  return delta;
+}
+
 void FnOfflineMap::onEnter() {
   _sdReady = SDManager::instance().begin();
   _hasPosition = false;
   _hasGpsPosition = false;
-  _centeredOnGps = false;
+  _followGps = true;
   _userPanned = false;
+  _needsRedraw = true;
+  _positionDirty = false;
+  _lastSaveMs = 0;
 
   if (_sdReady) {
     int maxZoom = SDManager::instance().maxTileZoom();
-    _zoom = (maxZoom >= ZOOM_MIN && maxZoom <= ZOOM_MAX) ? maxZoom : ZOOM_DEFAULT;
+    _maxZoom = (maxZoom >= ZOOM_MIN && maxZoom <= ZOOM_MAX) ? maxZoom : ZOOM_DEFAULT;
+    _zoom = _maxZoom;
   } else {
+    _maxZoom = ZOOM_MAX;
     _zoom = ZOOM_DEFAULT;
   }
 
-  _centerOnGps();
-
-  if (!_hasPosition && _sdReady) {
+  if (_sdReady) {
     double lat, lon;
     int savedZoom;
     if (SDManager::instance().loadPosition(lat, lon, savedZoom)) {
-      (void)savedZoom;
       _lat = clampMapLat(lat);
       _lon = wrapMapLon(lon);
+      _zoom = constrain(savedZoom, ZOOM_MIN, _maxZoom);
       _hasPosition = true;
+      _followGps = false;
     }
+  }
+
+  if (!_hasPosition) {
+    _centerOnGps();
   }
 }
 
-void FnOfflineMap::onUpdate(bool force) {
-  (void)force;
+void FnOfflineMap::onExit() {
+  if (_sdReady && _hasPosition) {
+    SDManager::instance().savePosition(_lat, _lon, _zoom);
+    _lastSaveMs = millis();
+    _positionDirty = false;
+  }
+}
 
+bool FnOfflineMap::needsRedraw(unsigned long now) {
+  (void)now;
+  if (_needsRedraw) return true;
+
+  GPSManager& gps = GPSManager::instance();
+  bool hasReliableFix = gps.hasReliableFix();
+  if (hasReliableFix != _hasGpsPosition) return true;
+  if (!hasReliableFix) return false;
+
+  double nextLat = clampMapLat(gps.latitude());
+  double nextLon = wrapMapLon(gps.longitude());
+  if (!_hasGpsPosition) return true;
+
+  double prevGpsPx, prevGpsPy, nextGpsPx, nextGpsPy;
+  latLonToPixel(_gpsLat, _gpsLon, _zoom, prevGpsPx, prevGpsPy);
+  latLonToPixel(nextLat, nextLon, _zoom, nextGpsPx, nextGpsPy);
+  double worldPx = mapWorldPixels(_zoom);
+  if (wrappedPixelDelta(nextGpsPx, prevGpsPx, worldPx) >= 1.0) return true;
+  if (fabs(nextGpsPy - prevGpsPy) >= 1.0) return true;
+
+  return false;
+}
+
+void FnOfflineMap::onUpdate(bool force) {
   M5Canvas& cv = DisplayManager::instance().canvas();
   GPSManager& gps = GPSManager::instance();
 
   if (gps.hasReliableFix()) {
-    _gpsLat = clampMapLat(gps.latitude());
-    _gpsLon = wrapMapLon(gps.longitude());
+    double nextGpsLat = clampMapLat(gps.latitude());
+    double nextGpsLon = wrapMapLon(gps.longitude());
+    bool gpsChanged = !_hasGpsPosition || nextGpsLat != _gpsLat || nextGpsLon != _gpsLon;
+    _gpsLat = nextGpsLat;
+    _gpsLon = nextGpsLon;
     _hasGpsPosition = true;
-    if (!_hasPosition || (!_centeredOnGps && !_userPanned)) {
+    if (!_hasPosition) {
       _lat = _gpsLat;
       _lon = _gpsLon;
       _hasPosition = true;
-      _centeredOnGps = true;
+      _followGps = true;
+      _needsRedraw = true;
+    } else if (_followGps && gpsChanged) {
+      _lat = _gpsLat;
+      _lon = _gpsLon;
+      _needsRedraw = true;
     }
   } else {
+    if (_hasGpsPosition) {
+      _needsRedraw = true;
+    }
     _hasGpsPosition = false;
   }
+
+  if (!force && !_needsRedraw) return;
 
   cv.fillScreen(MAP_BG_COLOR);
 
@@ -146,17 +204,21 @@ void FnOfflineMap::onUpdate(bool force) {
       if (sx + TILE_PX <= 0 || sx >= SCREEN_W) continue;
       if (sy + TILE_PX <= 0 || sy >= SCREEN_H) continue;
 
-      bool ok = false;
+      TileLoadStatus status = TILE_LOAD_NOT_FOUND;
       if (ty >= 0 && ty < tileCount) {
-        ok = SDManager::instance().loadTile(_zoom, wrapTileX(tx, _zoom), ty, sx, sy);
+        status = SDManager::instance().loadTile(_zoom, wrapTileX(tx, _zoom), ty, sx, sy);
       }
-      if (!ok) {
+      if (ty < 0 || ty >= tileCount) {
         int rx = max(sx, 0);
         int ry = max(sy, 0);
         int rw = min(sx + TILE_PX, SCREEN_W) - rx;
         int rh = min(sy + TILE_PX, SCREEN_H) - ry;
         if (rw > 0 && rh > 0) cv.fillRect(rx, ry, rw, rh, MAP_BG_COLOR);
+      } else if (status != TILE_LOAD_OK) {
+        _drawMissingTilePlaceholder(sx, sy, _zoom, wrapTileX(tx, _zoom), ty, status);
       }
+
+      yield();
     }
   }
 
@@ -192,12 +254,26 @@ void FnOfflineMap::onUpdate(bool force) {
     cv.setCursor(SCREEN_W - 42, SCREEN_H - 10);
     cv.print("No Fix");
   }
+
+  _needsRedraw = false;
 }
 
 bool FnOfflineMap::onKeyEvent(const KeyEvent& event) {
   if (event.pressed) {
+    if (event.key == 0x0D) { return true; }
     if (event.key == 'z') { _zoomBy(1); return true; }
     if (event.key == 'x') { _zoomBy(-1); return true; }
+    if (event.key == 'g') {
+      _centerOnGps();
+      if (_hasPosition) {
+        _followGps = true;
+        _userPanned = false;
+        _positionDirty = true;
+        _savePositionIfDue(false);
+        _needsRedraw = true;
+      }
+      return true;
+    }
   }
 
   if (event.pressed || event.held) {
@@ -221,7 +297,8 @@ void FnOfflineMap::_centerOnGps() {
   _lon = _gpsLon;
   _hasGpsPosition = true;
   _hasPosition = true;
-  _centeredOnGps = true;
+  _followGps = true;
+  _needsRedraw = true;
 }
 
 void FnOfflineMap::_panByPixels(int dx, int dy) {
@@ -233,17 +310,64 @@ void FnOfflineMap::_panByPixels(int dx, int dy) {
   double px, py;
   latLonToPixel(_lat, _lon, _zoom, px, py);
   pixelToLatLon(px + dx, py + dy, _zoom, _lat, _lon);
+  _followGps = false;
   _userPanned = true;
-  onUpdate(true);
-  DisplayManager::instance().commit();
+  _positionDirty = true;
+  _savePositionIfDue(false);
+  _needsRedraw = true;
 }
 
 void FnOfflineMap::_zoomBy(int delta) {
-  int nextZoom = constrain(_zoom + delta, ZOOM_MIN, ZOOM_MAX);
+  int nextZoom = constrain(_zoom + delta, ZOOM_MIN, _maxZoom);
   if (nextZoom == _zoom) return;
   _zoom = nextZoom;
-  onUpdate(true);
-  DisplayManager::instance().commit();
+  _positionDirty = true;
+  _savePositionIfDue(false);
+  _needsRedraw = true;
+}
+
+void FnOfflineMap::_savePositionIfDue(bool force) {
+  if (!_sdReady || !_hasPosition || !_positionDirty) return;
+
+  unsigned long now = millis();
+  if (!force && _lastSaveMs != 0 && now - _lastSaveMs < MAP_POSITION_SAVE_INTERVAL_MS) {
+    return;
+  }
+
+  SDManager::instance().savePosition(_lat, _lon, _zoom);
+  _lastSaveMs = now;
+  _positionDirty = false;
+}
+
+void FnOfflineMap::_drawMissingTilePlaceholder(int sx, int sy, int z, int x, int y, TileLoadStatus status) {
+  M5Canvas& cv = DisplayManager::instance().canvas();
+  int rx = max(sx, 0);
+  int ry = max(sy, 0);
+  int rw = min(sx + TILE_PX, SCREEN_W) - rx;
+  int rh = min(sy + TILE_PX, SCREEN_H) - ry;
+  if (rw <= 0 || rh <= 0) return;
+
+  cv.fillRect(rx, ry, rw, rh, MAP_TILE_PLACEHOLDER_COLOR);
+  cv.drawRect(rx, ry, rw, rh, MAP_TILE_PLACEHOLDER_LINE);
+  cv.drawLine(rx, ry, rx + rw - 1, ry + rh - 1, MAP_TILE_PLACEHOLDER_LINE);
+  cv.drawLine(rx + rw - 1, ry, rx, ry + rh - 1, MAP_TILE_PLACEHOLDER_LINE);
+
+  if (rw < 48 || rh < 24) return;
+
+  cv.setTextSize(1);
+  cv.setTextColor(TFT_WHITE, MAP_TILE_PLACEHOLDER_COLOR);
+  cv.setCursor(rx + 4, ry + 4);
+  cv.print("No tile");
+
+  if (MAP_SHOW_MISSING_TILE_DEBUG) {
+    char buf[32];
+    snprintf(buf, sizeof(buf), "%d/%d/%d", z, x, y);
+    cv.setCursor(rx + 4, ry + 14);
+    cv.print(buf);
+    snprintf(buf, sizeof(buf), "err:%d", (int)status);
+    cv.setCursor(rx + 4, ry + 24);
+    cv.print(buf);
+  }
 }
 
 void FnOfflineMap::drawIcon(int x, int y, int size, uint16_t color) {

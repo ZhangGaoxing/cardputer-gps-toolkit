@@ -47,6 +47,12 @@ public:
   virtual void onUpdate(bool force) = 0;
 
   /**
+   * 是否需要在本轮周期刷新时重绘
+   * 默认保持现有行为：总是允许重绘。
+   */
+  virtual bool needsRedraw(unsigned long now) { (void)now; return true; }
+
+  /**
    * 处理按键事件（IKeyListener接口实现）
    * 默认不处理，返回false让事件继续传递
    * @param event 按键事件

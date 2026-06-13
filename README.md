@@ -153,18 +153,40 @@ pip install osmium
 python tools/map_download.py --region asia/china -o tools
 
 # Generate tiles with the conversion tool
-python tools/tile_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+python tools/map_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+
+# Use the lightweight engine for small extracts
+python tools/map_convert.py input.osm.pbf --engine small -z 12-14 -b S,W,N,E -o gpstoolkit
 
 # Both scripts can also run interactively
 python tools/map_download.py
-python tools/tile_convert.py
+python tools/map_convert.py
 ```
 
-Parameters:
-- `-z 10-13`: generate tiles for zoom levels 10 through 13
-- `-b S,W,N,E`: bounding box (lat South, lon West, lat North, lon East)
-- `--engine small`: use the lightweight converter for small extracts
-- Interactive mode also supported (press Enter to use default zoom 10-12)
+Render engines:
+- `standard` -> `tools/osm2tile.py`: full/staged renderer. Better for normal and large extracts, supports staged/two-pass rendering, more complete area/label handling, and is the recommended default for SD card map packs.
+- `small` -> `tools/osm2tile_small.py`: lightweight chunk renderer. Better for small extracts and quick local regeneration, lower dependency and memory pressure, but the style/feature set is simpler than `standard`.
+
+Main parameters:
+- `input.osm.pbf`: source OSM extract.
+- `-z`, `--zoom`: zoom level or range, such as `12` or `10-14`.
+- `-b`, `--bbox`: bounding box in `south,west,north,east` order. Example: `31.1,120.9,31.6,121.8`.
+- `-o`, `--output`: output directory. The firmware expects `gpstoolkit/` so the resulting tiles become `/gpstoolkit/{z}/{x}/{y}.jpg` on the SD card.
+- `--engine standard|small`: choose the renderer backend.
+- `-l`, `--lang`: label language. Examples: `en`, `zh`, `ja`, or `name`.
+- `-j`, `--workers`: parallel render workers.
+- `-q`, `--quality`: JPEG quality. Used by the `small` engine.
+- `--tile-size`: tile size for the `standard` engine. Keep this at `256` for the firmware.
+- `-f`, `--format`: output format for the `standard` engine. Keep this as `JPG` for the firmware.
+- `--single-pass`: force the `standard` engine to skip staged/two-pass processing. Useful for smaller extracts or debugging.
+- `--no-areas`, `--no-ways`, `--no-pois`, `--no-labels`: selectively disable feature classes when troubleshooting style or performance issues.
+- `--dry-run`: print the final renderer command without executing it.
+
+Parameter notes:
+- `-b` limits both parsing and rendering to the specified geographic window. It is the most important parameter for keeping generation time and disk usage under control.
+- If you only need to update a city or district, use a narrow `-b` together with a small zoom range such as `-z 13-14` or `-z 14`.
+- For Cardputer, use `256x256 JPG` tiles. Other sizes or formats are not expected by the firmware.
+- Interactive mode is also supported: run `python tools/map_convert.py` and press Enter to accept defaults.
 
 > **Note**: Global map requires massive RAM (100+ GB). Convert only the region you need. Zoom 12 is sufficient for daily use.
 

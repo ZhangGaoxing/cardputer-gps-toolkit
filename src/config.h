@@ -78,7 +78,12 @@
 #define ZOOM_MIN      6
 #define ZOOM_MAX      18
 #define ZOOM_DEFAULT  15
-#define MAX_JPEG_BUF  36864
+#define MAP_TILE_CACHE_SIZE          2
+#define MAP_NEGATIVE_CACHE_SIZE      4
+#define MAP_POSITION_SAVE_INTERVAL_MS 5000UL
+#define MAP_MAX_TILE_BYTES           36864
+#define MAP_SHOW_MISSING_TILE_DEBUG  0
+#define MAX_JPEG_BUF  MAP_MAX_TILE_BYTES
 #define PAN_STEP      50
 #define DIR_REPEAT_MS 200
 

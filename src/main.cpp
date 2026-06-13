@@ -129,9 +129,11 @@ void loop() {
 
       if (now - lastFnDraw >= interval) {
         lastFnDraw = now;
-        DisplayManager::instance().clearScreen(TFT_BLACK);
-        fn->onUpdate(false);
-        DisplayManager::instance().commit();
+        if (fn->needsRedraw(now)) {
+          DisplayManager::instance().clearScreen(TFT_BLACK);
+          fn->onUpdate(false);
+          DisplayManager::instance().commit();
+        }
       }
     }
   }

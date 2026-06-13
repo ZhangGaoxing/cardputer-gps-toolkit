@@ -4,6 +4,8 @@
 #include "sd_manager.h"
 #include "display_manager.h"
 
+#include <string.h>
+
 static_assert(sizeof(VectorSegmentIndexEntry) == 16,
               "Vector index records must stay 16 bytes");
 
@@ -135,12 +137,120 @@ static int _jpegDrawCB(JPEGDRAW* p) {
   }
 
   _jpegTarget->pushImage(p->x, p->y, p->iWidth, p->iHeight, px);
+  yield();
   return 1;
 }
 
 SDManager& SDManager::instance() {
   static SDManager sd;
   return sd;
+}
+
+uint64_t SDManager::_tileKey(int z, int x, int y) const {
+  return ((uint64_t)(z & 0xFF) << 40) |
+         ((uint64_t)(x & 0xFFFFF) << 20) |
+         (uint64_t)(y & 0xFFFFF);
+}
+
+SDManager::TileCacheEntry* SDManager::_findTileCache(uint64_t key) {
+  for (int i = 0; i < MAP_TILE_CACHE_SIZE; i++) {
+    TileCacheEntry& entry = _tileCache[i];
+    if (entry.valid && entry.key == key) {
+      entry.lastUsed = ++_tileUseCounter;
+      return &entry;
+    }
+  }
+  return nullptr;
+}
+
+SDManager::TileCacheEntry* SDManager::_selectTileCacheSlot() {
+  TileCacheEntry* best = nullptr;
+  for (int i = 0; i < MAP_TILE_CACHE_SIZE; i++) {
+    TileCacheEntry& entry = _tileCache[i];
+    if (!entry.valid) return &entry;
+    if (!best || entry.lastUsed < best->lastUsed) {
+      best = &entry;
+    }
+  }
+  return best;
+}
+
+bool SDManager::_ensureTileBuffer(TileCacheEntry& entry) {
+  if (entry.data) return true;
+  entry.data = (uint8_t*)malloc(MAP_MAX_TILE_BYTES);
+  return entry.data != nullptr;
+}
+
+SDManager::NegativeTileCacheEntry* SDManager::_findNegativeTileCache(uint64_t key) {
+  for (int i = 0; i < MAP_NEGATIVE_CACHE_SIZE; i++) {
+    NegativeTileCacheEntry& entry = _negativeTileCache[i];
+    if (entry.valid && entry.key == key) {
+      entry.lastUsed = ++_tileUseCounter;
+      return &entry;
+    }
+  }
+  return nullptr;
+}
+
+void SDManager::_rememberNegativeTile(uint64_t key, TileLoadStatus status) {
+  if (!_shouldNegativeCache(status)) return;
+
+  NegativeTileCacheEntry* slot = nullptr;
+  for (int i = 0; i < MAP_NEGATIVE_CACHE_SIZE; i++) {
+    NegativeTileCacheEntry& entry = _negativeTileCache[i];
+    if (entry.valid && entry.key == key) {
+      slot = &entry;
+      break;
+    }
+    if (!slot || (!entry.valid) || entry.lastUsed < slot->lastUsed) {
+      slot = &entry;
+    }
+  }
+
+  if (!slot) return;
+  slot->valid = true;
+  slot->key = key;
+  slot->status = status;
+  slot->lastUsed = ++_tileUseCounter;
+}
+
+void SDManager::_clearNegativeTile(uint64_t key) {
+  for (int i = 0; i < MAP_NEGATIVE_CACHE_SIZE; i++) {
+    NegativeTileCacheEntry& entry = _negativeTileCache[i];
+    if (entry.valid && entry.key == key) {
+      entry.valid = false;
+      entry.lastUsed = 0;
+      return;
+    }
+  }
+}
+
+bool SDManager::_shouldNegativeCache(TileLoadStatus status) const {
+  switch (status) {
+    case TILE_LOAD_NOT_FOUND:
+    case TILE_LOAD_FILE_OPEN_ERROR:
+    case TILE_LOAD_FILE_READ_ERROR:
+    case TILE_LOAD_SIZE_INVALID:
+    case TILE_LOAD_DECODE_OPEN_FAILED:
+    case TILE_LOAD_DECODE_FAILED:
+      return true;
+    default:
+      return false;
+  }
+}
+
+TileLoadStatus SDManager::_decodeTileBuffer(const uint8_t* data, size_t size, int screenX, int screenY) {
+  _jpegTarget = &DisplayManager::instance().canvas();
+  int opened = _jpeg.openRAM((uint8_t*)data, (int)size, _jpegDrawCB);
+  if (!opened) {
+    _jpegTarget = nullptr;
+    return TILE_LOAD_DECODE_OPEN_FAILED;
+  }
+
+  int decoded = _jpeg.decode(screenX, screenY, 0);
+  _jpeg.close();
+  _jpegTarget = nullptr;
+  return decoded ? TILE_LOAD_OK : TILE_LOAD_DECODE_FAILED;
 }
 
 bool SDManager::begin() {
@@ -192,33 +302,70 @@ bool SDManager::begin() {
   return false;  // 5次重试全部失败
 }
 
-bool SDManager::loadTile(int z, int x, int y, int screenX, int screenY) {
-  if (!_ready) return false;
+TileLoadStatus SDManager::loadTile(int z, int x, int y, int screenX, int screenY) {
+  if (!_ready) return TILE_LOAD_NOT_READY;
+
+  uint64_t key = _tileKey(z, x, y);
+  if (NegativeTileCacheEntry* negative = _findNegativeTileCache(key)) {
+    return negative->status;
+  }
+
+  if (TileCacheEntry* cached = _findTileCache(key)) {
+    TileLoadStatus status = _decodeTileBuffer(cached->data, cached->size, screenX, screenY);
+    if (status == TILE_LOAD_OK) return status;
+
+    cached->valid = false;
+    cached->size = 0;
+    _rememberNegativeTile(key, status);
+    return status;
+  }
 
   char path[64];
   snprintf(path, sizeof(path), PATH_BASE "/%d/%d/%d.jpg", z, x, y);
 
   File f = SD.open(path, FILE_READ);
-  if (!f) return false;
-
-  size_t sz = f.size();
-  if (sz == 0 || sz > MAX_JPEG_BUF) { f.close(); return false; }
-
-  uint8_t* buf = (uint8_t*)malloc(sz);
-  if (!buf) { f.close(); return false; }
-
-  f.read(buf, sz);
-  f.close();
-
-  _jpegTarget = &DisplayManager::instance().canvas();
-
-  if (_jpeg.openRAM(buf, sz, _jpegDrawCB)) {
-    _jpeg.decode(screenX, screenY, 0);
-    _jpeg.close();
+  if (!f) {
+    TileLoadStatus status = SD.exists(path) ? TILE_LOAD_FILE_OPEN_ERROR : TILE_LOAD_NOT_FOUND;
+    _rememberNegativeTile(key, status);
+    return status;
   }
 
-  free(buf);
-  return true;
+  size_t sz = f.size();
+  if (sz == 0 || sz > MAP_MAX_TILE_BYTES) {
+    f.close();
+    _rememberNegativeTile(key, TILE_LOAD_SIZE_INVALID);
+    return TILE_LOAD_SIZE_INVALID;
+  }
+
+  TileCacheEntry* slot = _selectTileCacheSlot();
+  if (!slot || !_ensureTileBuffer(*slot)) {
+    f.close();
+    return TILE_LOAD_NO_MEMORY;
+  }
+
+  size_t rd = f.read(slot->data, sz);
+  f.close();
+  if (rd != sz) {
+    slot->valid = false;
+    slot->size = 0;
+    _rememberNegativeTile(key, TILE_LOAD_FILE_READ_ERROR);
+    return TILE_LOAD_FILE_READ_ERROR;
+  }
+
+  slot->valid = true;
+  slot->key = key;
+  slot->size = sz;
+  slot->lastUsed = ++_tileUseCounter;
+  _clearNegativeTile(key);
+  yield();
+
+  TileLoadStatus status = _decodeTileBuffer(slot->data, slot->size, screenX, screenY);
+  if (status != TILE_LOAD_OK) {
+    slot->valid = false;
+    slot->size = 0;
+    _rememberNegativeTile(key, status);
+  }
+  return status;
 }
 
 int SDManager::maxTileZoom() {
@@ -264,6 +411,9 @@ int SDManager::maxTileZoom() {
 void SDManager::savePosition(double lat, double lon, int zoom) {
   if (!_ready) return;
   SD.mkdir(PATH_BASE);
+  if (SD.exists(PATH_INI)) {
+    SD.remove(PATH_INI);
+  }
   File f = SD.open(PATH_INI, FILE_WRITE);
   if (f) {
     f.printf("%.6f,%.6f,%d\n", lat, lon, zoom);
@@ -283,7 +433,6 @@ bool SDManager::loadPosition(double& lat, double& lon, int& zoom) {
   lat  = line.substring(0, c1).toFloat();
   lon  = line.substring(c1 + 1, c2).toFloat();
   zoom = line.substring(c2 + 1).toInt();
-  if (lat == 0.0 && lon == 0.0) return false;
   if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return false;
   if (zoom < ZOOM_MIN || zoom > ZOOM_MAX) zoom = ZOOM_DEFAULT;
   return true;

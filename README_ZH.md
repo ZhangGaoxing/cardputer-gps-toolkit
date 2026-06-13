@@ -151,17 +151,40 @@ pip install protobuf grpcio-tools numpy Pillow
 python tools/map_download.py --region asia/china -o tools
 
 # 使用转换工具生成瓦片
-python tools/tile_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+python tools/map_convert.py input.osm.pbf -z 10-13 -b S,W,N,E -o gpstoolkit
+
+# 小范围区域可使用 lightweight 引擎
+python tools/map_convert.py input.osm.pbf --engine small -z 12-14 -b S,W,N,E -o gpstoolkit
 
 # 两个脚本也支持直接运行后交互输入
 python tools/map_download.py
-python tools/tile_convert.py
+python tools/map_convert.py
 ```
 
-参数说明：
-- `-z 10-13`：生成 zoom 10 到 13 级别的瓦片
-- `-b S,W,N,E`：边界框（南纬, 西经, 北纬, 东经）
-- 也支持交互模式（不指定 `-z` 参数时按 Enter 使用默认 10-12）
+渲染引擎区别：
+- `standard` -> `tools/osm2tile.py`：完整/分阶段渲染器，适合常规区域和较大范围数据，支持 staged/two-pass 处理，区域面和标签处理更完整，推荐作为默认离线地图生成方式。
+- `small` -> `tools/osm2tile_small.py`：轻量级 chunk 渲染器，适合小范围快速重生成，依赖和内存压力更低，但风格和要素完整度比 `standard` 更简化。
+
+主要参数说明：
+- `input.osm.pbf`：输入的 OSM 数据文件。
+- `-z`, `--zoom`：缩放级别或范围，例如 `12` 或 `10-14`。
+- `-b`, `--bbox`：边界框，格式为 `south,west,north,east`，例如 `31.1,120.9,31.6,121.8`。
+- `-o`, `--output`：输出目录。固件期望目录名为 `gpstoolkit/`，拷贝到 SD 卡后路径应为 `/gpstoolkit/{z}/{x}/{y}.jpg`。
+- `--engine standard|small`：选择渲染后端。
+- `-l`, `--lang`：地名语言，例如 `en`、`zh`、`ja` 或 `name`。
+- `-j`, `--workers`：并行渲染线程数。
+- `-q`, `--quality`：JPEG 质量，仅 `small` 引擎使用。
+- `--tile-size`：`standard` 引擎的瓦片尺寸。固件要求保持 `256`。
+- `-f`, `--format`：`standard` 引擎输出格式。固件要求保持 `JPG`。
+- `--single-pass`：强制 `standard` 引擎跳过 staged/two-pass，适合较小数据集或调试。
+- `--no-areas`、`--no-ways`、`--no-pois`、`--no-labels`：排查样式或性能问题时可临时关闭某类要素。
+- `--dry-run`：只打印最终执行命令，不实际渲染。
+
+参数使用建议：
+- `-b` 会同时限制解析和渲染范围，是控制生成时间、磁盘占用和问题定位最重要的参数。
+- 如果只需要更新某个城市或区县，建议搭配较小的 `-b` 和较窄的 zoom 范围，例如 `-z 13-14` 或只生成 `-z 14`。
+- Cardputer 固件只按 `256x256 JPG` 瓦片设计，其他尺寸或格式不建议用于 SD 卡离线地图。
+- 也支持交互模式：直接运行 `python tools/map_convert.py`，按 Enter 接受默认值即可。
 
 > **注意**：全球地图需要大量 RAM（100+ GB），建议只转换所需区域。日常使用 z12 基本满足需求。
 

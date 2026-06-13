@@ -703,6 +703,71 @@ def _draw_text(draw, x, y, nm, font_size, fill="#333333"):
               stroke_width=1, stroke_fill=(255, 255, 255))
 
 
+def _merge_way_segments(segments):
+    chains = [list(seg) for seg in segments if len(seg) >= 2]
+    merged = []
+
+    while chains:
+        chain = chains.pop()
+        changed = True
+        while changed:
+            changed = False
+            for idx in range(len(chains) - 1, -1, -1):
+                other = chains[idx]
+                if not other:
+                    chains.pop(idx)
+                    continue
+                if chain[-1] == other[0]:
+                    chain.extend(other[1:])
+                elif chain[-1] == other[-1]:
+                    chain.extend(reversed(other[:-1]))
+                elif chain[0] == other[-1]:
+                    chain = other[:-1] + chain
+                elif chain[0] == other[0]:
+                    chain = list(reversed(other[1:])) + chain
+                else:
+                    continue
+                chains.pop(idx)
+                changed = True
+                break
+        merged.append(chain)
+
+    return merged
+
+
+def _relation_area_ways(ways, relations):
+    way_map = {wid: nids for wid, _, nids in ways}
+    extras = []
+
+    for rel_id, tags, members in relations:
+        if tags.get("type") != "multipolygon":
+            continue
+        if not is_area(tags):
+            continue
+
+        outer_segments = []
+        for member in members:
+            if member["type"] != "way":
+                continue
+            if member["role"] not in ("", "outer"):
+                continue
+            nids = way_map.get(member["ref"])
+            if nids and len(nids) >= 3:
+                outer_segments.append(nids)
+
+        if not outer_segments:
+            continue
+
+        for ring_idx, ring in enumerate(_merge_way_segments(outer_segments)):
+            if len(ring) < 3:
+                continue
+            if ring[0] != ring[-1]:
+                ring = ring + [ring[0]]
+            extras.append((-(rel_id * 100 + ring_idx + 1), tags, ring))
+
+    return extras
+
+
 # ════════════════════════════════════════════════════════════════
 # §3.2  z11/z12 Small Icons
 # ════════════════════════════════════════════════════════════════
@@ -1267,6 +1332,7 @@ def render_region(nodes, ways, relations, zoom=14,
     if province_names is None: province_names = {}
 
     simplify_eps = _SIMPLIFY_TOL.get(zoom, 0)
+    tile_margin = max(24, tile_size // 8)
 
     print(f"Ways: {len(ways):,}", flush=True)
     print("Collecting candidate nodes...", flush=True)
@@ -1281,6 +1347,11 @@ def render_region(nodes, ways, relations, zoom=14,
 
     f_ids, f_lats, f_lons = nodes.get_coords_batch(fnids)
     if len(f_ids) == 0: print("No nodes found", flush=True); return
+
+    relation_area_ways = _relation_area_ways(ways, relations)
+    if relation_area_ways:
+        print(f"Relation areas: {len(relation_area_ways):,}", flush=True)
+        ways = ways + relation_area_ways
 
     lo0, lo1 = float(f_lons.min()), float(f_lons.max())
     la0, la1 = float(f_lats.min()), float(f_lats.max())
@@ -1352,7 +1423,11 @@ def render_region(nodes, ways, relations, zoom=14,
         tw = x1 - x0; th = y1 - y0
         if tw <= 0 or th <= 0: return 0
 
-        mask = (fpx >= x0) & (fpx < x1) & (fpy >= y0) & (fpy < y1)
+        px0 = x0 - tile_margin
+        py0 = y0 - tile_margin
+        px1 = x1 + tile_margin
+        py1 = y1 + tile_margin
+        mask = (fpx >= px0) & (fpx < px1) & (fpy >= py0) & (fpy < py1)
         tidx = np.where(mask)[0]
         npc = {}
         for idx in tidx:
@@ -1377,20 +1452,25 @@ def render_region(nodes, ways, relations, zoom=14,
             elif is_poi(wt): pois.append((wid, wt, coords))
             else: lines.append((wid, wt, coords))
 
-        img = Image.new("RGB", (tile_size, tile_size), BG_COLOR)
+        img_w = tw + tile_margin * 2
+        img_h = th + tile_margin * 2
+        img = Image.new("RGB", (img_w, img_h), BG_COLOR)
         draw = ImageDraw.Draw(img)
+
+        def local_point(px, py):
+            return (px - x0 + tile_margin, py - y0 + tile_margin)
 
         if render_areas and areas:
             for _, at, ac in areas:
                 fc, fo = _area_style(at)
-                pts = [(px - x0, py - y0) for _, (px, py) in ac.items()]
+                pts = [local_point(px, py) for _, (px, py) in ac.items()]
                 if simplify_eps > 0 and len(pts) > 4:
                     pts = _douglas_peucker(pts, simplify_eps)
                 if len(pts) >= 3: draw.polygon(pts, fill=_mix(fc, fo))
 
         if render_ways and lines:
             for _, lt, lc in lines:
-                pts = [(px - x0, py - y0) for _, (px, py) in lc.items()]
+                pts = [local_point(px, py) for _, (px, py) in lc.items()]
                 if len(pts) < 2: continue
                 if simplify_eps > 0:
                     pts = _douglas_peucker(pts, simplify_eps)
@@ -1430,7 +1510,7 @@ def render_region(nodes, ways, relations, zoom=14,
                 rk = pt.get("railway", "")
                 ak = pt.get("aeroway", "")
                 for nid, (px, py) in pc.items():
-                    cx = px - x0; cy = py - y0
+                    cx, cy = local_point(px, py)
                     if zoom <= 12:
                         if am == "hospital":
                             _draw_small_icon(draw, cx, cy,
@@ -1467,7 +1547,7 @@ def render_region(nodes, ways, relations, zoom=14,
                     nm = _get_name(wt)
                     if not nm or nm in rendered_names: continue
                     rendered_names.add(nm)
-                    pts = [(px - x0, py - y0)
+                    pts = [local_point(px, py)
                            for _, (px, py) in wc.items()]
                     if len(pts) < 2: continue
                     mx, my = pts[len(pts) // 2]
@@ -1477,7 +1557,7 @@ def render_region(nodes, ways, relations, zoom=14,
 
             if zoom == 6:
                 for nid, (px, py) in npc.items():
-                    cx = px - x0; cy = py - y0
+                    cx, cy = local_point(px, py)
                     if nid in province_names:
                         prov_nm = province_names[nid]
                         if prov_nm not in rendered_names:
@@ -1498,7 +1578,7 @@ def render_region(nodes, ways, relations, zoom=14,
 
             elif zoom == 7:
                 for nid, (px, py) in npc.items():
-                    cx = px - x0; cy = py - y0
+                    cx, cy = local_point(px, py)
                     if nid in admin_centres:
                         ac = admin_centres[nid]
                         city_nm = ac.get("5") or ""
@@ -1514,7 +1594,7 @@ def render_region(nodes, ways, relations, zoom=14,
             elif zoom <= 12:
                 s5, s6 = _AC_FONT.get(zoom, (10, 9))
                 for nid, (px, py) in npc.items():
-                    cx = px - x0; cy = py - y0
+                    cx, cy = local_point(px, py)
                     if nid not in admin_centres:
                         continue
                     ac = admin_centres[nid]
@@ -1539,7 +1619,7 @@ def render_region(nodes, ways, relations, zoom=14,
 
             elif zoom >= 13:
                 for nid, (px, py) in npc.items():
-                    cx = px - x0; cy = py - y0
+                    cx, cy = local_point(px, py)
                     if nid in place_nodes:
                         p_nm, p_type = place_nodes[nid]
                         tags = {"place": p_type, "name": p_nm}
@@ -1569,7 +1649,9 @@ def render_region(nodes, ways, relations, zoom=14,
         td = os.path.join(output_dir, str(zoom), str(gx))
         os.makedirs(td, exist_ok=True)
         ext = "jpg" if is_jpg else tile_format.lower()
-        img.save(os.path.join(td, f"{gy}.{ext}"), **save_kw)
+        tile_img = img.crop((tile_margin, tile_margin,
+                     tile_margin + tw, tile_margin + th))
+        tile_img.save(os.path.join(td, f"{gy}.{ext}"), **save_kw)
         return 1
 
     workers = max(1, int(workers or 1))
