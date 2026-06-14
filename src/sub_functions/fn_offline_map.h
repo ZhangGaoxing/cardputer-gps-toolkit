@@ -20,6 +20,8 @@ private:
   void _zoomBy(int delta);
   void _savePositionIfDue(bool force);
   void _drawMissingTilePlaceholder(int sx, int sy, int z, int x, int y, TileLoadStatus status);
+  void _drawWaypoints();       // 绘制屏幕范围内航点标记
+  void _createWaypointFromCenter();  // 从地图中心创建航点
   double _lat = 0, _lon = 0;
   double _gpsLat = 0, _gpsLon = 0;
   int _zoom = ZOOM_DEFAULT;
@@ -32,5 +34,7 @@ private:
   bool _needsRedraw = true;
   bool _positionDirty = false;
   unsigned long _lastSaveMs = 0;
+  unsigned long _lastWpFeedbackMs = 0;   // 航点操作反馈计时器
+  char _wpFeedback[32] = "";              // 航点操作反馈文字
 };
 #endif

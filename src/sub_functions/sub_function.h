@@ -60,6 +60,13 @@ public:
    */
   bool onKeyEvent(const KeyEvent& event) override { return false; }
 
+  /**
+   * 当返回 true 时，ESC/` 不会被 EscInterceptor 拦截，
+   * 而是传递给本函数的 onKeyEvent() 自行处理。
+   * 用于有内部子页面的函数（如 Waypoint 的 List→Detail→Create 导航）。
+   */
+  virtual bool wantsEsc() { return false; }
+
   // ======== 显示属性 ========
 
   /** 内容更新间隔(ms)，默认1000ms（1Hz刷新） */

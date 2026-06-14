@@ -13,6 +13,7 @@
 #include "trip_tracker.h"
 #include "gpx_writer.h"
 #include "sd_manager.h"
+#include "waypoint_manager.h"
 
 class EscInterceptor : public IKeyListener {
 public:
@@ -20,6 +21,10 @@ public:
     if (MenuSystem::instance().isInMenu()) return false;
 
     if (event.pressed && (event.key == '`' || event.key == 0x1B)) {
+      SubFunction* fn = MenuSystem::instance().activeFunction();
+      if (fn && fn->wantsEsc()) {
+        return false;  // 让子功能自己处理 ESC
+      }
       MenuSystem::instance().exitFunction();
       return true;
     }
@@ -48,6 +53,7 @@ void setup() {
   IMUManager::instance().begin();
   TripTracker::instance().begin();
   GpxWriter::instance().begin();
+  WaypointManager::instance().begin();
 
   MenuSystem::instance().begin();
   KeyboardManager::instance().setListener(&MenuSystem::instance());

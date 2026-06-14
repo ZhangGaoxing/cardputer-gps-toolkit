@@ -13,7 +13,7 @@
 | 4 | 3D Globe | 3D 旋转地球（实时渲染 + 卫星轨道可视化，自动旋转 12°/s） |
 | 5 | World Map | 矢量世界地图（SD 卡存储 Natural Earth 海岸线数据，支持 6 级缩放） |
 | 6 | Offline Map | 离线瓦片地图（SD 卡存储，OpenStreetMap 标准滑图格式，支持 6-18 级缩放） |
-| 7 | Waypoint | 航点导航（指南针箭头 + 方位角 + 距离，支持手动输入目标坐标） |
+| 7 | Waypoint | 航点管理（列表/详情/从 GPS 或地图中心建点，距离和方位角运行时计算） |
 | 8 | NMEA | NMEA 监视器（16 行原始 NMEA 语句滚动显示） |
 | 9 | About | 关于页面（软件信息、作者、致谢） |
 
@@ -89,13 +89,32 @@ pio device monitor -b 115200
 | `z` | World Map / Offline Map | 放大 |
 | `x` | World Map / Offline Map | 缩小 |
 | `;` `.` `,` `/` | Offline Map | 平移地图（上下左右） |
+| `g` | Offline Map | 重新回到当前 GPS 位置 |
+| `w` | Offline Map | 在当前地图中心保存一个航点 |
 
 ### 航点功能专用操作
 
 | 按键 | 适用功能 | 功能 |
 |------|----------|------|
-| `w` | Waypoint | 进入/退出航点编辑模式 |
-| `r` | Waypoint | 清除当前航点 |
+| `;` `.` | Waypoint 列表页 | 移动选中项 / 循环切换 |
+| `Enter` | Waypoint 列表页 | 打开选中航点详情 |
+| `n` | Waypoint 列表页 | 进入 GPS 建点页面 |
+| `d` | Waypoint 列表页/详情页 | 进入删除确认 |
+| `r` | Waypoint 列表页 | 从 SD 卡重新加载航点 |
+| `` ` `` | Waypoint 详情/创建/删除页 | 返回航点列表 |
+| `Tab` 或 `Space` | Waypoint 创建页 | 编辑航点名称 |
+| `Enter` | Waypoint 创建页 | 结束名称编辑 |
+| `Backspace` | Waypoint 创建页 | 编辑时删除一个字符 |
+| `g` | Waypoint 创建页 | 使用当前 reliable GPS fix 保存航点 |
+| `y` / `n` | Waypoint 删除页 | 确认 / 取消删除 |
+
+### 航点使用流程
+
+- 在 Offline Map 页面按 `w`，会以当前地图中心保存航点。这和实时 GPS 位置不同；如果你平移过地图，保存的是地图中心，不是当前位置。
+- 在 Waypoint 页面按 `n` 进入 GPS 建点页，再按 `g` 用当前 reliable fix 建点；没有 reliable fix 时会禁止创建。
+- 航点文件保存在 SD 卡的 `/gpstoolkit/waypoints/waypoints.csv`，增删改后会自动保存。
+- 如果 SD 保存失败，系统会保留旧文件，并通过 `.tmp` / `.bak` 恢复逻辑避免误覆盖；UI 会显示错误，不再把失败误报成成功。
+- 距离和方位角始终根据当前 GPS 位置运行时计算，不会写入航点持久化文件。
 
 ### 轨迹功能专用操作
 

@@ -5,6 +5,8 @@
 #include "../display_manager.h"
 #include "../gps_manager.h"
 #include "../sd_manager.h"
+#include "../waypoint_manager.h"
+#include "../geo_math.h"
 
 #include <math.h>
 #include <string.h>
@@ -13,9 +15,9 @@ static const uint16_t MAP_BG_COLOR = 0xF77C;
 static const uint16_t MAP_TILE_PLACEHOLDER_COLOR = 0x8C51;
 static const uint16_t MAP_TILE_PLACEHOLDER_LINE = 0x5AEB;
 static const double WEB_MERCATOR_MAX_LAT = 85.05112878;
-static const double MAP_PI = 3.14159265358979323846;
-static const double DEG_TO_RAD_D = 0.017453292519943295;
-static const double RAD_TO_DEG_D = 57.29577951308232;
+static const double OFFLINE_MAP_PI = 3.14159265358979323846;
+static const double OFFLINE_DEG_TO_RAD = 0.017453292519943295;
+static const double OFFLINE_RAD_TO_DEG = 57.29577951308232;
 
 static double clampMapLat(double lat) {
   if (lat > WEB_MERCATOR_MAX_LAT) return WEB_MERCATOR_MAX_LAT;
@@ -37,7 +39,7 @@ static void latLonToPixel(double lat, double lon, int zoom, double& px, double& 
   lat = clampMapLat(lat);
   double worldPx = mapWorldPixels(zoom);
   px = (wrapMapLon(lon) + 180.0) / 360.0 * worldPx;
-  py = (1.0 - asinh(tan(lat * DEG_TO_RAD_D)) / MAP_PI) / 2.0 * worldPx;
+  py = (1.0 - asinh(tan(lat * OFFLINE_DEG_TO_RAD)) / OFFLINE_MAP_PI) / 2.0 * worldPx;
 }
 
 static void pixelToLatLon(double px, double py, int zoom, double& lat, double& lon) {
@@ -48,7 +50,7 @@ static void pixelToLatLon(double px, double py, int zoom, double& lat, double& l
   if (py > worldPx) py = worldPx;
 
   lon = px / worldPx * 360.0 - 180.0;
-  lat = atan(sinh(MAP_PI * (1.0 - 2.0 * py / worldPx))) * RAD_TO_DEG_D;
+  lat = atan(sinh(OFFLINE_MAP_PI * (1.0 - 2.0 * py / worldPx))) * OFFLINE_RAD_TO_DEG;
   lat = clampMapLat(lat);
 }
 
@@ -74,6 +76,8 @@ void FnOfflineMap::onEnter() {
   _needsRedraw = true;
   _positionDirty = false;
   _lastSaveMs = 0;
+  _lastWpFeedbackMs = 0;
+  _wpFeedback[0] = '\0';
 
   if (_sdReady) {
     int maxZoom = SDManager::instance().maxTileZoom();
@@ -237,10 +241,26 @@ void FnOfflineMap::onUpdate(bool force) {
     }
   }
 
+  // 绘制航点标记
+  _drawWaypoints();
+
+  // 航点操作反馈
+  if (_wpFeedback[0] != '\0') {
+    unsigned long now = millis();
+    if (_lastWpFeedbackMs != 0 && now - _lastWpFeedbackMs > 2000) {
+      _wpFeedback[0] = '\0';
+    } else {
+      cv.setTextSize(1);
+      cv.setTextColor(TFT_BLACK, TFT_GREEN);
+      cv.setCursor(2, 2);
+      cv.print(_wpFeedback);
+    }
+  }
+
   cv.setTextSize(1);
   cv.setTextColor(TFT_DARKGREY);
-  char zBuf[24];
-  snprintf(zBuf, sizeof(zBuf), "z%d [z+/x-]", _zoom);
+  char zBuf[32];
+  snprintf(zBuf, sizeof(zBuf), "z%d [z+/x-] [w]WP", _zoom);
   cv.setCursor(2, SCREEN_H - 10);
   cv.print(zBuf);
 
@@ -272,6 +292,11 @@ bool FnOfflineMap::onKeyEvent(const KeyEvent& event) {
         _savePositionIfDue(false);
         _needsRedraw = true;
       }
+      return true;
+    }
+    if (event.key == 'w') {
+      // w → 从地图中心创建航点
+      _createWaypointFromCenter();
       return true;
     }
   }
@@ -368,6 +393,142 @@ void FnOfflineMap::_drawMissingTilePlaceholder(int sx, int sy, int z, int x, int
     cv.setCursor(rx + 4, ry + 24);
     cv.print(buf);
   }
+}
+
+// ==================================================================
+//  航点标记绘制
+// ==================================================================
+void FnOfflineMap::_drawWaypoints() {
+  WaypointManager& wm = WaypointManager::instance();
+  if (wm.count() == 0) return;
+
+  M5Canvas& cv = DisplayManager::instance().canvas();
+
+  // 计算当前屏幕的地理范围（用于粗略过滤）
+  double centerPx, centerPy;
+  latLonToPixel(_lat, _lon, _zoom, centerPx, centerPy);
+  double leftPx = centerPx - SCREEN_W / 2.0;
+  double topPx = centerPy - SCREEN_H / 2.0;
+
+  double screenLeftLon, screenTopLat, screenRightLon, screenBottomLat;
+  pixelToLatLon(leftPx, topPx, _zoom, screenTopLat, screenLeftLon);
+  pixelToLatLon(leftPx + SCREEN_W, topPx + SCREEN_H, _zoom, screenBottomLat, screenRightLon);
+
+  // 轻微扩展范围（边界外航点仍可见）
+  double pad = (screenRightLon - screenLeftLon) * 0.1;
+  double minLon = screenLeftLon - pad;
+  double maxLon = screenRightLon + pad;
+  double minLat = screenBottomLat - pad;
+  double maxLat = screenTopLat + pad;
+
+  double worldPx = mapWorldPixels(_zoom);
+
+  for (size_t i = 0; i < wm.count(); i++) {
+    const Waypoint* wp = wm.getByIndex(i);
+    if (!wp) continue;
+
+    // 粗略地理范围过滤
+    if (wp->lat < minLat || wp->lat > maxLat ||
+        wp->lon < minLon || wp->lon > maxLon) continue;
+
+    double wpx, wpy;
+    latLonToPixel(wp->lat, wp->lon, _zoom, wpx, wpy);
+
+    // 处理日界线穿越
+    double dx = wpx - centerPx;
+    if (dx > worldPx / 2.0) dx -= worldPx;
+    if (dx < -worldPx / 2.0) dx += worldPx;
+
+    int sx = SCREEN_W / 2 + (int)round(dx);
+    int sy = SCREEN_H / 2 + (int)round(wpy - centerPy);
+
+    if (sx < 2 || sx > SCREEN_W - 3 || sy < 2 || sy > SCREEN_H - 3) continue;
+
+    // Cross marker with outline for readability on light/dark maps
+    uint16_t wptFill, wptOutline;
+    switch ((WaypointType)wp->type) {
+      case WP_TYPE_DANGER:    wptFill = TFT_RED;       wptOutline = TFT_BLACK;  break;
+      case WP_TYPE_WATER:     wptFill = TFT_BLUE;      wptOutline = TFT_WHITE;  break;
+      case WP_TYPE_CAMP:      wptFill = TFT_GREEN;     wptOutline = TFT_BLACK;  break;
+      case WP_TYPE_SUMMIT:    wptFill = TFT_ORANGE;    wptOutline = TFT_BLACK;  break;
+      case WP_TYPE_VIEWPOINT: wptFill = TFT_YELLOW;    wptOutline = TFT_BLACK;  break;
+      case WP_TYPE_TRAILHEAD: wptFill = TFT_MAGENTA;   wptOutline = TFT_BLACK;  break;
+      default:                wptFill = TFT_CYAN;      wptOutline = TFT_BLACK;  break;
+    }
+
+    // Thick outline cross
+    cv.drawLine(sx - 4, sy, sx + 4, sy, wptOutline);
+    cv.drawLine(sx, sy - 4, sx, sy + 4, wptOutline);
+    // Thin fill cross
+    cv.drawLine(sx - 2, sy, sx + 2, sy, wptFill);
+    cv.drawLine(sx, sy - 2, sx, sy + 2, wptFill);
+    cv.fillCircle(sx, sy, 2, wptFill);
+
+    // Short name (max 3 chars, black bg for readability)
+    char shortName[4] = "";
+    strncpy(shortName, wp->name, 3);
+    shortName[3] = '\0';
+    if (strlen(shortName) > 0) {
+      cv.setTextSize(1);
+      int tw = strlen(shortName) * 6 + 2;
+      cv.fillRect(sx + 4, sy - 5, tw, 9, TFT_BLACK);
+      cv.setTextColor(wptFill);
+      cv.setCursor(sx + 5, sy - 4);
+      cv.print(shortName);
+    }
+  }
+}
+
+void FnOfflineMap::_createWaypointFromCenter() {
+  WaypointManager& wm = WaypointManager::instance();
+
+  if (wm.isFull()) {
+    strncpy(_wpFeedback, "WP list full!", sizeof(_wpFeedback) - 1);
+    _wpFeedback[sizeof(_wpFeedback) - 1] = '\0';
+    _lastWpFeedbackMs = millis();
+    _needsRedraw = true;
+    return;
+  }
+
+  if (!_hasPosition) {
+    strncpy(_wpFeedback, "No map position", sizeof(_wpFeedback) - 1);
+    _wpFeedback[sizeof(_wpFeedback) - 1] = '\0';
+    _lastWpFeedbackMs = millis();
+    _needsRedraw = true;
+    return;
+  }
+
+  char name[WAYPOINT_NAME_MAX_LEN];
+  snprintf(name, sizeof(name), "MAP%03u", wm.nextId());
+
+  // 获取 GPS 时间（如果可用）
+  GPSManager& gps = GPSManager::instance();
+  int yr = 0, mo = 0, dy = 0, hr = 0, mi = 0, se = 0;
+  if (gps.timeValid() && gps.dateValid()) {
+    yr = gps.utcYear();
+    mo = gps.utcMonth();
+    dy = gps.utcDay();
+    hr = gps.utcHour();
+    mi = gps.utcMinute();
+    se = gps.utcSecond();
+  }
+
+  const Waypoint* wp = wm.addWaypoint(
+    name,
+    (float)_lat, (float)_lon, 0.0f,
+    WP_SRC_MAP_CENTER,
+    WP_TYPE_CUSTOM,
+    "",
+    yr, mo, dy, hr, mi, se
+  );
+
+  if (wp) {
+    snprintf(_wpFeedback, sizeof(_wpFeedback), "Saved: %s", wp->name);
+  } else {
+    snprintf(_wpFeedback, sizeof(_wpFeedback), "Failed: %.12s", wm.lastError());
+  }
+  _lastWpFeedbackMs = millis();
+  _needsRedraw = true;
 }
 
 void FnOfflineMap::drawIcon(int x, int y, int size, uint16_t color) {

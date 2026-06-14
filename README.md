@@ -13,7 +13,7 @@ A comprehensive GPS toolkit for M5Stack Cardputer ADV (ESP32-S3), integrating GP
 | 4 | 3D Globe | 3D spinning globe (real-time rendering + satellite orbit visualization, 12°/s auto-rotation) |
 | 5 | World Map | Vector world map (Natural Earth coastline data on SD card, 6 zoom levels) |
 | 6 | Offline Map | Offline tile map (SD card, OpenStreetMap slippy-map format, zoom 6-18) |
-| 7 | Waypoint | Waypoint navigation (compass arrow + bearing + distance, manual target input) |
+| 7 | Waypoint | Waypoint manager (list/detail/create from GPS or map center, runtime distance + bearing) |
 | 8 | NMEA | NMEA monitor (16-line scrolling raw NMEA sentence display) |
 | 9 | About | About page (software info, author, credits) |
 
@@ -89,13 +89,32 @@ pio device monitor -b 115200
 | `z` | World Map / Offline Map | Zoom in |
 | `x` | World Map / Offline Map | Zoom out |
 | `;` `.` `,` `/` | Offline Map | Pan (up/down/left/right) |
+| `g` | Offline Map | Re-center map on current GPS fix |
+| `w` | Offline Map | Save a waypoint at the current map center |
 
 ### Waypoint Function
 
 | Key | Function | Action |
 |-----|----------|--------|
-| `w` | Waypoint | Enter/exit edit mode |
-| `r` | Waypoint | Clear current waypoint |
+| `;` `.` | Waypoint list | Move selection / wrap around |
+| `Enter` | Waypoint list | Open selected waypoint details |
+| `n` | Waypoint list | Open GPS waypoint creation page |
+| `d` | Waypoint list/detail | Open delete confirmation |
+| `r` | Waypoint list | Reload waypoints from SD card |
+| `` ` `` | Waypoint detail/create/delete | Return to waypoint list |
+| `Tab` or `Space` | Waypoint create | Edit waypoint name |
+| `Enter` | Waypoint create | Finish name editing |
+| `Backspace` | Waypoint create | Delete one character while editing |
+| `g` | Waypoint create | Save waypoint from current reliable GPS fix |
+| `y` / `n` | Waypoint delete | Confirm / cancel delete |
+
+### Waypoint Workflow
+
+- In Offline Map, press `w` to create a waypoint at the current map center. This is different from your live GPS position if you have panned away from your location.
+- In Waypoint, press `n` to create a waypoint from the current GPS fix. Creation is blocked until a reliable GPS fix is available.
+- Waypoints are stored on the SD card at `/gpstoolkit/waypoints/waypoints.csv` and are auto-saved after add/delete/update operations.
+- If SD save fails, the existing file is kept via `.tmp` / `.bak` recovery logic and the UI shows the error instead of pretending the operation succeeded.
+- Distance and bearing are calculated at runtime from the current GPS position; they are not persisted in the waypoint file.
 
 ### Trip Function
 

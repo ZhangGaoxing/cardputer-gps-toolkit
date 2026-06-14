@@ -113,6 +113,16 @@
 #define PATH_COAST_LOW_IDX  "/gpstoolkit/vector/coast_low.idx"
 #define PATH_BORDER_LOW_IDX "/gpstoolkit/vector/border_low.idx"
 
+// ==================================================================
+//  Waypoint 航点参数
+// ==================================================================
+#define WAYPOINT_MAX_COUNT        100
+#define WAYPOINT_NAME_MAX_LEN     16
+#define WAYPOINT_NOTE_MAX_LEN     32
+#define WAYPOINT_FILE_PATH        "/gpstoolkit/waypoints/waypoints.csv"
+#define WAYPOINT_BACKUP_ENABLED   1
+#define WAYPOINT_AUTO_SAVE        1
+
 // 坐标缩放因子（度 * 100 存储为 int16_t）
 #define COORD_SCALE 100
 
@@ -185,6 +195,29 @@ enum GPSState {
   GPS_SEARCHING,
   GPS_FIX,
   GPS_RELIABLE_FIX
+};
+
+// ==================================================================
+//  航点来源枚举
+// ==================================================================
+enum WaypointSource {
+  WP_SRC_CURRENT_FIX = 0,   // 从当前位置创建
+  WP_SRC_MAP_CENTER,        // 从地图中心创建
+  WP_SRC_MANUAL,            // 手动输入坐标
+  WP_SRC_IMPORTED           // 从外部导入
+};
+
+// ==================================================================
+//  航点类型枚举
+// ==================================================================
+enum WaypointType {
+  WP_TYPE_CUSTOM = 0,       // 自定义/通用
+  WP_TYPE_CAMP,             // 营地
+  WP_TYPE_WATER,            // 水源
+  WP_TYPE_DANGER,           // 危险/警告
+  WP_TYPE_SUMMIT,           // 山顶
+  WP_TYPE_VIEWPOINT,        // 观景点
+  WP_TYPE_TRAILHEAD         // 步道起点
 };
 
 // ==================================================================

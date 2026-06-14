@@ -1,5 +1,6 @@
 #include "trip_tracker.h"
 #include "ui_helpers.h"
+#include "geo_math.h"
 
 TripTracker& TripTracker::instance() { static TripTracker tt; return tt; }
 
