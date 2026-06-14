@@ -21,6 +21,7 @@
 #include "sub_functions/fn_offline_map.h"
 #include "sub_functions/fn_waypoint.h"
 #include "sub_functions/fn_nmea_monitor.h"
+#include "sub_functions/fn_settings.h"
 #include "sub_functions/fn_about.h"
 
 MenuSystem& MenuSystem::instance() {
@@ -29,7 +30,7 @@ MenuSystem& MenuSystem::instance() {
 }
 
 void MenuSystem::begin() {
-  // 顺序: Dashboard, Signal, Trip, Clock, 3D Globe, World Map, Offline Map, Waypoint, NMEA, About
+  // 顺序: Dashboard, Signal, Trip, Clock, 3D Globe, World Map, Offline Map, Waypoint, NMEA, Settings, About
   _items.push_back(new FnGpsDashboard());
   _items.push_back(new FnSignalBars());
   _items.push_back(new FnTrip());
@@ -39,6 +40,7 @@ void MenuSystem::begin() {
   _items.push_back(new FnOfflineMap());
   _items.push_back(new FnWaypoint());
   _items.push_back(new FnNmeaMonitor());
+  _items.push_back(new FnSettings());
   _items.push_back(new FnAbout());
 }
 
@@ -48,7 +50,8 @@ void MenuSystem::begin() {
 
 void MenuSystem::_navigateLeft() {
   if (_animating) return;
-  _selectedIndex = (_selectedIndex - 1 + (int)_items.size()) % (int)_items.size();
+  _animFromIndex = _selectedIndex;
+  _animToIndex = (_selectedIndex - 1 + (int)_items.size()) % (int)_items.size();
   _animDir = -1;
   _animProgress = 0;
   _animating = true;
@@ -57,7 +60,8 @@ void MenuSystem::_navigateLeft() {
 
 void MenuSystem::_navigateRight() {
   if (_animating) return;
-  _selectedIndex = (_selectedIndex + 1) % (int)_items.size();
+  _animFromIndex = _selectedIndex;
+  _animToIndex = (_selectedIndex + 1) % (int)_items.size();
   _animDir = +1;
   _animProgress = 0;
   _animating = true;
@@ -76,6 +80,7 @@ void MenuSystem::updateAnimation() {
   if (t >= 1.0f) {
     _animProgress = 1.0f;
     _animating = false;
+    _selectedIndex = _animToIndex;
     _animDir = 0;
   } else {
     // ease-out: 1 - (1-t)^2
@@ -107,9 +112,11 @@ void MenuSystem::draw() {
   cv.setCursor(4, tipY + 4);
   cv.print("[,]/[/] Nav  [Ent] Open  [`] Back");
 
+  int currentIndex = _animating ? _animToIndex : _selectedIndex;
+
   // 页标
   char pageBuf[16];
-  snprintf(pageBuf, sizeof(pageBuf), "%d/%d", _selectedIndex + 1, (int)_items.size());
+  snprintf(pageBuf, sizeof(pageBuf), "%d/%d", currentIndex + 1, (int)_items.size());
   int pw = strlen(pageBuf) * 6;
   cv.setTextColor(UI_DIM);
   cv.setCursor(SCREEN_W - pw - 4, tipY + 4);
@@ -123,7 +130,7 @@ void MenuSystem::draw() {
   int dotStartX = (SCREEN_W - dotsWidth) / 2;
   for (int d = 0; d < totalDots; d++) {
     int dx = dotStartX + d * dotSpacing;
-    if (d == _selectedIndex) {
+    if (d == currentIndex) {
       cv.fillCircle(dx, dotY, 3, UI_ACTIVE);
     } else {
       cv.drawCircle(dx, dotY, 2, UI_DIM);
@@ -133,15 +140,28 @@ void MenuSystem::draw() {
   int centerX = SCREEN_W / 2;
   int centerY = STATUSBAR_HEIGHT + (tipY - STATUSBAR_HEIGHT) / 2;
 
-  // 动画
-  float animShift = _animDir * (1.0f - _animProgress) * MENU_ITEM_SPACING;
+  if (_animating) {
+    float animShift = _animDir * _animProgress * MENU_ITEM_SPACING;
+    int deltaStart = (_animDir > 0) ? -1 : -2;
+    int deltaEnd = (_animDir > 0) ? 2 : 1;
+
+    for (int delta = deltaStart; delta <= deltaEnd; delta++) {
+      int idx = (_animFromIndex + delta + (int)_items.size()) % (int)_items.size();
+      int cx = centerX + delta * MENU_ITEM_SPACING - (int)animShift;
+      bool selected = (idx == _animToIndex && _animProgress >= 0.5f) ||
+                      (idx == _animFromIndex && _animProgress < 0.5f);
+      int cyOffset = selected ? -4 : MENU_Y_OFFSET;
+      _drawMenuItem(idx, cx, centerY + cyOffset, selected);
+    }
+    return;
+  }
 
   // 绘制选中项 + 左右各1个
   for (int delta = -1; delta <= 1; delta++) {
     int idx = (_selectedIndex + delta + (int)_items.size()) % (int)_items.size();
     bool selected = (delta == 0);
 
-    int cx = centerX + delta * MENU_ITEM_SPACING - (int)(animShift);
+    int cx = centerX + delta * MENU_ITEM_SPACING;
     // 非选中项向下偏移，产生3D弧形效果
     int cyOffset = selected ? -4 : MENU_Y_OFFSET;
     _drawMenuItem(idx, cx, centerY + cyOffset, selected);
@@ -192,6 +212,9 @@ void MenuSystem::enterFunction() {
   KeyboardManager::instance().clearKeyStates();
   _activeFn->onEnter();
   KeyboardManager::instance().setListener(_activeFn);
+  DisplayManager::instance().clearScreen(TFT_BLACK);
+  _activeFn->onUpdate(true);
+  DisplayManager::instance().commit();
 }
 
 void MenuSystem::exitFunction() {

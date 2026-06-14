@@ -36,6 +36,8 @@ private:
 
   std::vector<SubFunction*> _items;
   int _selectedIndex = 0;
+  int _animFromIndex = 0;
+  int _animToIndex = 0;
 
   // 动画状态
   int _animDir = 0;            // +1=右移(新项从右边来), -1=左移(新项从左边来), 0=无动画

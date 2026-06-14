@@ -33,6 +33,8 @@
 #define STATUSBAR_HEIGHT 14    // 状态栏高度（仅菜单模式使用）
 #define CONTENT_TOP  0    // 内容区域起始Y坐标（子功能全屏，菜单模式用 STATUSBAR_HEIGHT 偏移）
 #define CONTENT_H    135   // 内容区域高度
+#define BRIGHTNESS_LEVEL_COUNT 3
+#define SLEEP_TIMEOUT_COUNT   4
 
 // ==================================================================
 //  轨迹记录参数
@@ -139,7 +141,7 @@
 #define MENU_ANIM_DURATION 250  // 动画持续时间(ms)
 
 // ==================================================================
-//  屏幕ID枚举 (10个菜单项)
+//  屏幕ID枚举 (11个菜单项)
 // ==================================================================
 enum ScreenID {
   SCR_GPS_DASHBOARD = 0,
@@ -151,8 +153,9 @@ enum ScreenID {
   SCR_OFFLINE_MAP,
   SCR_WAYPOINT,
   SCR_NMEA_MONITOR,
+  SCR_SETTINGS,
   SCR_ABOUT,
-  SCR_COUNT  // = 10
+  SCR_COUNT
 };
 
 // ==================================================================
@@ -168,6 +171,7 @@ enum IconType {
   ICON_OFFLINE_MAP,
   ICON_WAYPOINT,
   ICON_NMEA,
+  ICON_SETTINGS,
   ICON_ABOUT
 };
 

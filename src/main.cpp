@@ -12,6 +12,7 @@
 #include "imu_manager.h"
 #include "trip_tracker.h"
 #include "gpx_writer.h"
+#include "sd_manager.h"
 
 class EscInterceptor : public IKeyListener {
 public:
@@ -29,6 +30,12 @@ public:
 void setup() {
   auto cfg = M5.config();
   M5Cardputer.begin(cfg);
+
+  DisplaySettingsData displaySettings;
+  if (SDManager::instance().begin() && SDManager::instance().loadDisplaySettings(displaySettings)) {
+    DisplayManager::instance().setBrightnessLevel(displaySettings.brightnessLevel);
+    DisplayManager::instance().setSleepTimeoutIndex(displaySettings.sleepTimeoutIndex);
+  }
 
   DisplayManager::instance().begin();
 
@@ -109,9 +116,11 @@ void loop() {
   }
 
   KeyboardManager::instance().scan();
+  unsigned long now = millis();
+  DisplayManager::instance().updatePowerState(now, KeyboardManager::instance().lastActivityMillis());
 
   MenuSystem& menu = MenuSystem::instance();
-  unsigned long now = millis();
+
   if (menu.isInMenu()) {
     menu.updateAnimation();
     static unsigned long lastMenuDraw = 0;

@@ -77,6 +77,11 @@ enum TileLoadStatus {
   TILE_LOAD_DECODE_FAILED
 };
 
+struct DisplaySettingsData {
+  uint8_t brightnessLevel = 1;
+  uint8_t sleepTimeoutIndex = 1;
+};
+
 class SDManager {
 public:
   static SDManager& instance();
@@ -98,10 +103,25 @@ public:
   /** 从INI文件加载上次GPS位置 */
   bool loadPosition(double& lat, double& lon, int& zoom);
 
+  /** 保存显示设置 */
+  bool saveDisplaySettings(const DisplaySettingsData& settings);
+
+  /** 加载显示设置 */
+  bool loadDisplaySettings(DisplaySettingsData& settings);
+
   /** 获取JPEG解码器引用（供离线地图使用） */
   JPEGDEC& jpegDecoder() { return _jpeg; }
 
 private:
+  struct IniState {
+    bool hasPosition = false;
+    double lat = 0.0;
+    double lon = 0.0;
+    int zoom = ZOOM_DEFAULT;
+    bool hasDisplaySettings = false;
+    DisplaySettingsData displaySettings;
+  };
+
   struct TileCacheEntry {
     bool valid = false;
     uint64_t key = 0;
@@ -130,6 +150,8 @@ private:
   void _clearNegativeTile(uint64_t key);
   TileLoadStatus _decodeTileBuffer(const uint8_t* data, size_t size, int screenX, int screenY);
   bool _shouldNegativeCache(TileLoadStatus status) const;
+  bool _loadIniState(IniState& state);
+  bool _saveIniState(const IniState& state);
 
   bool _ready = false;
   bool _initAttempted = false;

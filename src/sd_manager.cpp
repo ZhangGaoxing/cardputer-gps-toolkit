@@ -410,30 +410,108 @@ int SDManager::maxTileZoom() {
 
 void SDManager::savePosition(double lat, double lon, int zoom) {
   if (!_ready) return;
+  IniState state;
+  _loadIniState(state);
+  state.hasPosition = true;
+  state.lat = lat;
+  state.lon = lon;
+  state.zoom = zoom;
+  _saveIniState(state);
+}
+
+bool SDManager::loadPosition(double& lat, double& lon, int& zoom) {
+  IniState state;
+  if (!_loadIniState(state) || !state.hasPosition) return false;
+  lat = state.lat;
+  lon = state.lon;
+  zoom = state.zoom;
+  return true;
+}
+
+bool SDManager::saveDisplaySettings(const DisplaySettingsData& settings) {
+  if (!_ready) return false;
+  IniState state;
+  _loadIniState(state);
+  state.hasDisplaySettings = true;
+  state.displaySettings.brightnessLevel = settings.brightnessLevel;
+  state.displaySettings.sleepTimeoutIndex = settings.sleepTimeoutIndex;
+  return _saveIniState(state);
+}
+
+bool SDManager::loadDisplaySettings(DisplaySettingsData& settings) {
+  IniState state;
+  if (!_loadIniState(state) || !state.hasDisplaySettings) return false;
+  settings = state.displaySettings;
+  return true;
+}
+
+bool SDManager::_loadIniState(IniState& state) {
+  if (!_ready) return false;
+  File f = SD.open(PATH_INI, FILE_READ);
+  if (!f) return false;
+
+  while (f.available()) {
+    String line = f.readStringUntil('\n');
+    line.trim();
+    if (line.length() == 0) continue;
+
+    if (line.startsWith("POS=")) {
+      line.remove(0, 4);
+    }
+
+    int c1 = line.indexOf(',');
+    int c2 = line.indexOf(',', c1 + 1);
+    if (c1 > 0 && c2 > c1 && !line.startsWith("DISPLAY=")) {
+      double lat = line.substring(0, c1).toFloat();
+      double lon = line.substring(c1 + 1, c2).toFloat();
+      int zoom = line.substring(c2 + 1).toInt();
+      if (lat >= -90 && lat <= 90 && lon >= -180 && lon <= 180) {
+        state.hasPosition = true;
+        state.lat = lat;
+        state.lon = lon;
+        state.zoom = (zoom < ZOOM_MIN || zoom > ZOOM_MAX) ? ZOOM_DEFAULT : zoom;
+      }
+      continue;
+    }
+
+    if (line.startsWith("DISPLAY=")) {
+      String body = line.substring(8);
+      int d1 = body.indexOf(',');
+      if (d1 < 0) continue;
+      int brightness = body.substring(0, d1).toInt();
+      int sleep = body.substring(d1 + 1).toInt();
+      if (brightness >= 0 && brightness < BRIGHTNESS_LEVEL_COUNT &&
+          sleep >= 0 && sleep < SLEEP_TIMEOUT_COUNT) {
+        state.hasDisplaySettings = true;
+        state.displaySettings.brightnessLevel = (uint8_t)brightness;
+        state.displaySettings.sleepTimeoutIndex = (uint8_t)sleep;
+      }
+    }
+  }
+
+  f.close();
+  return state.hasPosition || state.hasDisplaySettings;
+}
+
+bool SDManager::_saveIniState(const IniState& state) {
+  if (!_ready) return false;
   SD.mkdir(PATH_BASE);
   if (SD.exists(PATH_INI)) {
     SD.remove(PATH_INI);
   }
-  File f = SD.open(PATH_INI, FILE_WRITE);
-  if (f) {
-    f.printf("%.6f,%.6f,%d\n", lat, lon, zoom);
-    f.close();
-  }
-}
 
-bool SDManager::loadPosition(double& lat, double& lon, int& zoom) {
-  if (!_ready) return false;
-  File f = SD.open(PATH_INI, FILE_READ);
+  File f = SD.open(PATH_INI, FILE_WRITE);
   if (!f) return false;
-  String line = f.readStringUntil('\n');
+
+  if (state.hasPosition) {
+    f.printf("POS=%.6f,%.6f,%d\n", state.lat, state.lon, state.zoom);
+  }
+  if (state.hasDisplaySettings) {
+    f.printf("DISPLAY=%u,%u\n",
+             (unsigned)state.displaySettings.brightnessLevel,
+             (unsigned)state.displaySettings.sleepTimeoutIndex);
+  }
+
   f.close();
-  int c1 = line.indexOf(',');
-  int c2 = line.indexOf(',', c1 + 1);
-  if (c1 < 0 || c2 < 0) return false;
-  lat  = line.substring(0, c1).toFloat();
-  lon  = line.substring(c1 + 1, c2).toFloat();
-  zoom = line.substring(c2 + 1).toInt();
-  if (lat < -90 || lat > 90 || lon < -180 || lon > 180) return false;
-  if (zoom < ZOOM_MIN || zoom > ZOOM_MAX) zoom = ZOOM_DEFAULT;
   return true;
 }

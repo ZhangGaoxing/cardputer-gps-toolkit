@@ -54,6 +54,9 @@ public:
   /** 检查指定按键是否刚按下 */
   bool isKeyPressed(char key) const;
 
+  /** 最近一次键盘活动时间(ms) */
+  unsigned long lastActivityMillis() const { return _lastActivityMs; }
+
   /** 获取方向键重复的第一步延迟(ms)，首次按下后等待 */
   unsigned long holdRepeatFirstDelay() const { return 400; }
 
@@ -73,6 +76,7 @@ private:
   bool _prevKeyStates[KEY_STATE_SIZE] = {};         // 上一帧的按键状态
   unsigned long _keyPressTime[KEY_STATE_SIZE] = {}; // 按键按下的时间戳
   bool _keyRepeatArmed[KEY_STATE_SIZE] = {};        // 是否已进入重复模式
+  unsigned long _lastActivityMs = 0;
 
   /**
    * 将KeyEvent分发给全局拦截器和当前监听者

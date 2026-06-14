@@ -52,6 +52,8 @@ void KeyboardManager::scan() {
         event.holdDuration = now - _keyPressTime[i];
       }
 
+      _lastActivityMs = now;
+
       // 分发事件（如果被消费则更新状态并停止本轮扫描）
       if (_dispatch(event)) {
         _prevKeyStates[i] = currStates[i];
@@ -71,6 +73,7 @@ void KeyboardManager::scan() {
         event.released = false;
         event.held = true;
         event.holdDuration = held;
+        _lastActivityMs = now;
         _dispatch(event);
       }
     }
@@ -89,6 +92,7 @@ void KeyboardManager::clearKeyStates() {
   memset(_prevKeyStates, 0, sizeof(_prevKeyStates));
   memset(_keyPressTime, 0, sizeof(_keyPressTime));
   memset(_keyRepeatArmed, 0, sizeof(_keyRepeatArmed));
+  _lastActivityMs = millis();
 }
 
 bool KeyboardManager::isKeyPressed(char key) const {
