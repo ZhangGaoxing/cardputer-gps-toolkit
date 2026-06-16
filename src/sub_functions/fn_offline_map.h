@@ -25,6 +25,7 @@ private:
   void _drawMissingTilePlaceholder(int sx, int sy, int z, int x, int y, TileLoadStatus status);
   void _drawWaypoints();
   void _drawNavigationOverlay();
+  void _drawBacktrackOverlay();
   void _createWaypointFromCenter();
 
   double _lat = 0, _lon = 0;
@@ -41,6 +42,11 @@ private:
   bool _lastNavArrived = false;
   uint16_t _lastNavTargetId = 0;
   float _lastNavBearingDeg = NAN;
+  bool _lastBacktrackActive = false;
+  bool _lastBacktrackArrived = false;
+  bool _lastBacktrackOffTrack = false;
+  size_t _lastBacktrackTargetIndex = 0;
+  float _lastBacktrackBearingDeg = NAN;
   bool _positionDirty = false;
   unsigned long _lastSaveMs = 0;
   unsigned long _lastWpFeedbackMs = 0;

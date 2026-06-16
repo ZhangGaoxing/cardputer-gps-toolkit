@@ -7,6 +7,7 @@
 #include "../imu_manager.h"
 #include "../gpx_writer.h"
 #include "../gps_manager.h"
+#include "../backtrack_manager.h"
 
 static void formatDuration(uint32_t ms, char* buf, int bufSize) {
   uint32_t sec = ms / 1000;
@@ -40,6 +41,7 @@ void FnTrip::onUpdate(bool force) {
     case 3: _drawAlt();    break;
     case 4: _drawSpeed();  break;
   }
+  _drawBacktrackBanner();
 }
 
 bool FnTrip::onKeyEvent(const KeyEvent& event) {
@@ -57,6 +59,15 @@ bool FnTrip::onKeyEvent(const KeyEvent& event) {
       gw.begin();
       gw.startRecording(gps.utcYear(), gps.utcMonth(), gps.utcDay(),
                         gps.utcHour(), gps.utcMinute(), gps.utcSecond());
+    }
+    return true;
+  }
+  if (event.pressed && (event.key == 'b' || event.key == 'B')) {
+    BacktrackManager& bt = BacktrackManager::instance();
+    if (bt.isActive()) {
+      bt.stop("Canceled");
+    } else {
+      bt.startFromCurrentTrip(BacktrackTargetMode::ReturnToStart);
     }
     return true;
   }
@@ -420,7 +431,7 @@ void FnTrip::_drawRecord() {
 
     cv.setTextColor(TFT_GREENYELLOW);
     cv.setCursor(4, y);
-    cv.print("[Enter] Stop Recording");
+    cv.print("[Enter] Stop Rec  [b]Backtrack");
   } else {
     if (gpsOk) {
       cv.setTextColor(UI_BRASS);
@@ -451,7 +462,32 @@ void FnTrip::_drawRecord() {
 
     cv.setTextColor(sdOk && gpsOk ? TFT_GREEN : TFT_DARKGREY);
     cv.setCursor(4, y);
-    cv.print("[Enter] Start Recording");
+    cv.print("[Enter] Start Rec  [b]Backtrack");
+  }
+}
+
+void FnTrip::_drawBacktrackBanner() {
+  M5Canvas& cv = DisplayManager::instance().canvas();
+  BacktrackManager& bt = BacktrackManager::instance();
+  const BacktrackState& st = bt.state();
+
+  cv.setTextSize(1);
+  if (bt.isActive()) {
+    cv.setTextColor(st.offTrack ? TFT_ORANGE : TFT_YELLOW);
+    cv.setCursor(134, 2);
+    cv.print(st.offTrack ? "BT OFFTRK" : "BT ON");
+    return;
+  }
+
+  const char* err = bt.lastError();
+  if (err[0] != '\0' && _subTab <= 1) {
+    cv.setTextColor(TFT_YELLOW);
+    cv.setCursor(116, 2);
+    cv.printf("BT:%.10s", err);
+  } else {
+    cv.setTextColor(TFT_DARKGREY);
+    cv.setCursor(164, 2);
+    cv.print("[b]BT");
   }
 }
 

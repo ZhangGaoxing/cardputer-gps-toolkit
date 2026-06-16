@@ -19,5 +19,6 @@ private:
   void _drawAlt();
   void _drawSpeed();
   void _drawRecord();
+  void _drawBacktrackBanner();
 };
 #endif

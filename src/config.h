@@ -133,6 +133,18 @@
 #define NAV_TARGET_LINE_ENABLED     1
 #define NAV_PERSIST_TARGET_ENABLED  0
 
+// ==================================================================
+//  Backtrack navigation parameters
+// ==================================================================
+#define BACKTRACK_MAX_POINTS             120
+#define BACKTRACK_MIN_POINTS_TO_START      4
+#define BACKTRACK_MIN_POINT_DISTANCE_M    8.0f
+#define BACKTRACK_TARGET_LOOKAHEAD_POINTS 2
+#define BACKTRACK_ARRIVAL_RADIUS_M       20.0f
+#define BACKTRACK_OFF_ROUTE_DISTANCE_M   50.0f
+#define BACKTRACK_RECALC_INTERVAL_MS    500UL
+#define BACKTRACK_LINE_DRAW_ENABLED       1
+
 // 坐标缩放因子（度 * 100 存储为 int16_t）
 #define COORD_SCALE 100
 
@@ -167,6 +179,7 @@ enum ScreenID {
   SCR_GPS_DASHBOARD = 0,
   SCR_SIGNAL_BARS,
   SCR_TRIP,
+  SCR_BACKTRACK,
   SCR_GPS_CLOCK,
   SCR_3D_GLOBE,
   SCR_WORLD_MAP,
@@ -186,6 +199,7 @@ enum IconType {
   ICON_DASHBOARD = 0,
   ICON_SIGNAL_BARS,
   ICON_TRIP,
+  ICON_BACKTRACK,
   ICON_CLOCK,
   ICON_3D_GLOBE,
   ICON_WORLD_MAP,

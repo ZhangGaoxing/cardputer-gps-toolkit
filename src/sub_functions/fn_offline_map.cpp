@@ -7,6 +7,7 @@
 #include "../sd_manager.h"
 #include "../waypoint_manager.h"
 #include "../navigation_manager.h"
+#include "../backtrack_manager.h"
 #include "../geo_math.h"
 
 #include <math.h>
@@ -19,6 +20,9 @@ static const uint16_t MAP_NAV_LINE_COLOR = TFT_MAGENTA;
 static const uint16_t MAP_NAV_TARGET_COLOR = TFT_CYAN;
 static const uint16_t MAP_NAV_ARRIVED_COLOR = TFT_GREEN;
 static const uint16_t MAP_NAV_OUTLINE_COLOR = TFT_BLACK;
+static const uint16_t MAP_BACKTRACK_LINE_COLOR = TFT_ORANGE;
+static const uint16_t MAP_BACKTRACK_TARGET_COLOR = TFT_YELLOW;
+static const uint16_t MAP_BACKTRACK_START_COLOR = TFT_GREEN;
 static const double WEB_MERCATOR_MAX_LAT = 85.05112878;
 static const double OFFLINE_MAP_PI = 3.14159265358979323846;
 static const double OFFLINE_DEG_TO_RAD = 0.017453292519943295;
@@ -89,6 +93,11 @@ void FnOfflineMap::onEnter() {
   _lastNavArrived = false;
   _lastNavTargetId = 0;
   _lastNavBearingDeg = NAN;
+  _lastBacktrackActive = false;
+  _lastBacktrackArrived = false;
+  _lastBacktrackOffTrack = false;
+  _lastBacktrackTargetIndex = 0;
+  _lastBacktrackBearingDeg = NAN;
   _positionDirty = false;
   _lastSaveMs = 0;
   _lastWpFeedbackMs = 0;
@@ -138,6 +147,16 @@ bool FnOfflineMap::needsRedraw(unsigned long now) {
   if (navState.active && navState.arrived != _lastNavArrived) return true;
   if (navState.active && navState.dataAvailable &&
       angularDeltaDeg(navState.bearingDeg, _lastNavBearingDeg) >= 2.0f) {
+    return true;
+  }
+
+  const BacktrackState& btState = BacktrackManager::instance().state();
+  if (btState.active != _lastBacktrackActive) return true;
+  if (btState.active && btState.targetIndex != _lastBacktrackTargetIndex) return true;
+  if (btState.active && btState.arrived != _lastBacktrackArrived) return true;
+  if (btState.active && btState.offTrack != _lastBacktrackOffTrack) return true;
+  if (btState.active && btState.dataAvailable &&
+      angularDeltaDeg(btState.bearingDeg, _lastBacktrackBearingDeg) >= 2.0f) {
     return true;
   }
 
@@ -267,6 +286,7 @@ void FnOfflineMap::onUpdate(bool force) {
 
   // 绘制航点标记
   _drawWaypoints();
+  _drawBacktrackOverlay();
   _drawNavigationOverlay();
 
   // 航点操作反馈
@@ -307,6 +327,14 @@ void FnOfflineMap::onUpdate(bool force) {
     _lastNavArrived = navState.arrived;
     _lastNavTargetId = navState.targetId;
     _lastNavBearingDeg = navState.dataAvailable ? navState.bearingDeg : NAN;
+  }
+  {
+    const BacktrackState& btState = BacktrackManager::instance().state();
+    _lastBacktrackActive = btState.active;
+    _lastBacktrackArrived = btState.arrived;
+    _lastBacktrackOffTrack = btState.offTrack;
+    _lastBacktrackTargetIndex = btState.targetIndex;
+    _lastBacktrackBearingDeg = btState.dataAvailable ? btState.bearingDeg : NAN;
   }
 }
 
@@ -509,6 +537,81 @@ void FnOfflineMap::_drawWaypoints() {
       cv.print(shortName);
     }
   }
+}
+
+void FnOfflineMap::_drawBacktrackOverlay() {
+#if BACKTRACK_LINE_DRAW_ENABLED
+  BacktrackManager& bt = BacktrackManager::instance();
+  const BacktrackState& st = bt.state();
+  if (!st.active || bt.pointCount() == 0 || !_hasPosition) return;
+
+  M5Canvas& cv = DisplayManager::instance().canvas();
+
+  double centerPx, centerPy;
+  latLonToPixel(_lat, _lon, _zoom, centerPx, centerPy);
+  double worldPx = mapWorldPixels(_zoom);
+
+  auto toScreen = [&](float lat, float lon, int& sx, int& sy) {
+    double px, py;
+    latLonToPixel(lat, lon, _zoom, px, py);
+    double dx = px - centerPx;
+    if (dx > worldPx / 2.0) dx -= worldPx;
+    if (dx < -worldPx / 2.0) dx += worldPx;
+    sx = SCREEN_W / 2 + (int)round(dx);
+    sy = SCREEN_H / 2 + (int)round(py - centerPy);
+    return sx >= -12 && sx <= SCREEN_W + 12 && sy >= -12 && sy <= SCREEN_H + 12;
+  };
+
+  int prevX = 0, prevY = 0;
+  bool prevVisible = false;
+  TrackPoint prev = bt.pointAt(0);
+  prevVisible = toScreen(prev.lat, prev.lon, prevX, prevY);
+
+  for (size_t i = 1; i < bt.pointCount(); i++) {
+    TrackPoint cur = bt.pointAt(i);
+    int x = 0, y = 0;
+    bool visible = toScreen(cur.lat, cur.lon, x, y);
+    if (!cur.segmentStart && (prevVisible || visible)) {
+      cv.drawLine(prevX - 1, prevY, x - 1, y, MAP_NAV_OUTLINE_COLOR);
+      cv.drawLine(prevX + 1, prevY, x + 1, y, MAP_NAV_OUTLINE_COLOR);
+      cv.drawLine(prevX, prevY - 1, x, y - 1, MAP_NAV_OUTLINE_COLOR);
+      cv.drawLine(prevX, prevY + 1, x, y + 1, MAP_NAV_OUTLINE_COLOR);
+      cv.drawLine(prevX, prevY, x, y, MAP_BACKTRACK_LINE_COLOR);
+    }
+    prev = cur;
+    prevX = x;
+    prevY = y;
+    prevVisible = visible;
+  }
+
+  TrackPoint start;
+  if (bt.startPoint(start)) {
+    int sx = 0, sy = 0;
+    if (toScreen(start.lat, start.lon, sx, sy)) {
+      cv.fillCircle(sx, sy, 7, MAP_NAV_OUTLINE_COLOR);
+      cv.drawCircle(sx, sy, 6, TFT_WHITE);
+      cv.fillCircle(sx, sy, 3, MAP_BACKTRACK_START_COLOR);
+    }
+  }
+
+  TrackPoint target;
+  if (bt.targetPoint(target)) {
+    int tx = 0, ty = 0;
+    if (toScreen(target.lat, target.lon, tx, ty)) {
+      uint16_t col = st.arrived ? MAP_BACKTRACK_START_COLOR : MAP_BACKTRACK_TARGET_COLOR;
+      cv.fillCircle(tx, ty, 7, MAP_NAV_OUTLINE_COLOR);
+      cv.drawRect(tx - 5, ty - 5, 10, 10, TFT_WHITE);
+      cv.fillCircle(tx, ty, 3, col);
+    }
+  }
+
+  if (st.offTrack) {
+    cv.setTextSize(1);
+    cv.setTextColor(TFT_BLACK, TFT_ORANGE);
+    cv.setCursor(2, 14);
+    cv.print("OFF TRACK");
+  }
+#endif
 }
 
 void FnOfflineMap::_drawNavigationOverlay() {

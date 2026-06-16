@@ -15,6 +15,7 @@
 #include "sd_manager.h"
 #include "waypoint_manager.h"
 #include "navigation_manager.h"
+#include "backtrack_manager.h"
 
 class EscInterceptor : public IKeyListener {
 public:
@@ -56,6 +57,7 @@ void setup() {
   GpxWriter::instance().begin();
   WaypointManager::instance().begin();
   NavigationManager::instance().begin();
+  BacktrackManager::instance().begin();
 
   MenuSystem::instance().begin();
   KeyboardManager::instance().setListener(&MenuSystem::instance());
@@ -123,6 +125,8 @@ void loop() {
       // GpxWriter moves itself to Error and exposes lastError() for the UI.
     }
   }
+
+  BacktrackManager::instance().update();
 
   KeyboardManager::instance().scan();
   unsigned long now = millis();

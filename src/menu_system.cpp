@@ -15,6 +15,7 @@
 #include "sub_functions/fn_gps_dashboard.h"
 #include "sub_functions/fn_signal_bars.h"
 #include "sub_functions/fn_trip.h"
+#include "sub_functions/fn_backtrack.h"
 #include "sub_functions/fn_gps_clock.h"
 #include "sub_functions/fn_3d_globe.h"
 #include "sub_functions/fn_world_map.h"
@@ -35,6 +36,7 @@ void MenuSystem::begin() {
   _items.push_back(new FnGpsDashboard());
   _items.push_back(new FnSignalBars());
   _items.push_back(new FnTrip());
+  _items.push_back(new FnBacktrack());
   _items.push_back(new FnGpsClock());
   _items.push_back(new Fn3DGlobe());
   _items.push_back(new FnWorldMap());

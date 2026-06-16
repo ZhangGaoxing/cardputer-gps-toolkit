@@ -4,6 +4,7 @@
 #include "navigation_manager.h"
 #include "gps_manager.h"
 #include "geo_math.h"
+#include "backtrack_manager.h"
 
 #include <math.h>
 #include <string.h>
@@ -31,6 +32,10 @@ bool NavigationManager::startGoto(uint16_t waypointId) {
   if (!isValidCoordinate(wp->lat, wp->lon)) {
     _setError("Invalid target");
     return false;
+  }
+
+  if (BacktrackManager::instance().isActive()) {
+    BacktrackManager::instance().stop("Go-to active");
   }
 
   memset(&_state, 0, sizeof(_state));

@@ -1,10 +1,12 @@
 #include "trip_tracker.h"
 #include "ui_helpers.h"
 #include "geo_math.h"
+#include "backtrack_manager.h"
 
 TripTracker& TripTracker::instance() { static TripTracker tt; return tt; }
 
 void TripTracker::begin() {
+  BacktrackManager::instance().stop("Track cleared");
   memset(_buf,0,sizeof(_buf));
   _head=_count=0;
   _stats=TripStats();
