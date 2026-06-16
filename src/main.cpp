@@ -14,6 +14,7 @@
 #include "gpx_writer.h"
 #include "sd_manager.h"
 #include "waypoint_manager.h"
+#include "navigation_manager.h"
 
 class EscInterceptor : public IKeyListener {
 public:
@@ -54,6 +55,7 @@ void setup() {
   TripTracker::instance().begin();
   GpxWriter::instance().begin();
   WaypointManager::instance().begin();
+  NavigationManager::instance().begin();
 
   MenuSystem::instance().begin();
   KeyboardManager::instance().setListener(&MenuSystem::instance());
@@ -81,6 +83,7 @@ void loop() {
 
   BatteryManager::instance().update();
   IMUManager::instance().update();
+  NavigationManager::instance().update();
 
   TripFixQuality tripQuality;
   tripQuality.reliableFix = hasReliableFix;

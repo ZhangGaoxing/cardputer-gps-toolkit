@@ -6,6 +6,7 @@
 #include "../gps_manager.h"
 #include "../sd_manager.h"
 #include "../waypoint_manager.h"
+#include "../navigation_manager.h"
 #include "../geo_math.h"
 
 #include <math.h>
@@ -14,6 +15,10 @@
 static const uint16_t MAP_BG_COLOR = 0xF77C;
 static const uint16_t MAP_TILE_PLACEHOLDER_COLOR = 0x8C51;
 static const uint16_t MAP_TILE_PLACEHOLDER_LINE = 0x5AEB;
+static const uint16_t MAP_NAV_LINE_COLOR = TFT_MAGENTA;
+static const uint16_t MAP_NAV_TARGET_COLOR = TFT_CYAN;
+static const uint16_t MAP_NAV_ARRIVED_COLOR = TFT_GREEN;
+static const uint16_t MAP_NAV_OUTLINE_COLOR = TFT_BLACK;
 static const double WEB_MERCATOR_MAX_LAT = 85.05112878;
 static const double OFFLINE_MAP_PI = 3.14159265358979323846;
 static const double OFFLINE_DEG_TO_RAD = 0.017453292519943295;
@@ -67,6 +72,12 @@ static double wrappedPixelDelta(double nextPx, double prevPx, double worldPx) {
   return delta;
 }
 
+static float angularDeltaDeg(float a, float b) {
+  if (!isfinite(a) || !isfinite(b)) return 360.0f;
+  float d = fabsf(a - b);
+  return d > 180.0f ? 360.0f - d : d;
+}
+
 void FnOfflineMap::onEnter() {
   _sdReady = SDManager::instance().begin();
   _hasPosition = false;
@@ -74,6 +85,10 @@ void FnOfflineMap::onEnter() {
   _followGps = true;
   _userPanned = false;
   _needsRedraw = true;
+  _lastNavActive = false;
+  _lastNavArrived = false;
+  _lastNavTargetId = 0;
+  _lastNavBearingDeg = NAN;
   _positionDirty = false;
   _lastSaveMs = 0;
   _lastWpFeedbackMs = 0;
@@ -116,6 +131,15 @@ void FnOfflineMap::onExit() {
 bool FnOfflineMap::needsRedraw(unsigned long now) {
   (void)now;
   if (_needsRedraw) return true;
+
+  const NavigationState& navState = NavigationManager::instance().state();
+  if (navState.active != _lastNavActive) return true;
+  if (navState.active && navState.targetId != _lastNavTargetId) return true;
+  if (navState.active && navState.arrived != _lastNavArrived) return true;
+  if (navState.active && navState.dataAvailable &&
+      angularDeltaDeg(navState.bearingDeg, _lastNavBearingDeg) >= 2.0f) {
+    return true;
+  }
 
   GPSManager& gps = GPSManager::instance();
   bool hasReliableFix = gps.hasReliableFix();
@@ -243,6 +267,7 @@ void FnOfflineMap::onUpdate(bool force) {
 
   // 绘制航点标记
   _drawWaypoints();
+  _drawNavigationOverlay();
 
   // 航点操作反馈
   if (_wpFeedback[0] != '\0') {
@@ -276,6 +301,13 @@ void FnOfflineMap::onUpdate(bool force) {
   }
 
   _needsRedraw = false;
+  {
+    const NavigationState& navState = NavigationManager::instance().state();
+    _lastNavActive = navState.active;
+    _lastNavArrived = navState.arrived;
+    _lastNavTargetId = navState.targetId;
+    _lastNavBearingDeg = navState.dataAvailable ? navState.bearingDeg : NAN;
+  }
 }
 
 bool FnOfflineMap::onKeyEvent(const KeyEvent& event) {
@@ -477,6 +509,88 @@ void FnOfflineMap::_drawWaypoints() {
       cv.print(shortName);
     }
   }
+}
+
+void FnOfflineMap::_drawNavigationOverlay() {
+  NavigationManager& nav = NavigationManager::instance();
+  const NavigationState& st = nav.state();
+  if (!st.active || !st.dataAvailable || !_hasGpsPosition) return;
+
+  GPSManager& gps = GPSManager::instance();
+  if (!gps.hasReliableFix()) return;
+
+  M5Canvas& cv = DisplayManager::instance().canvas();
+
+  double centerPx, centerPy;
+  latLonToPixel(_lat, _lon, _zoom, centerPx, centerPy);
+
+  double gpsPx, gpsPy, targetPx, targetPy;
+  latLonToPixel(_gpsLat, _gpsLon, _zoom, gpsPx, gpsPy);
+  latLonToPixel(st.targetLat, st.targetLon, _zoom, targetPx, targetPy);
+
+  double worldPx = mapWorldPixels(_zoom);
+  double gpsDx = gpsPx - centerPx;
+  if (gpsDx > worldPx / 2.0) gpsDx -= worldPx;
+  if (gpsDx < -worldPx / 2.0) gpsDx += worldPx;
+  int gx = SCREEN_W / 2 + (int)round(gpsDx);
+  int gy = SCREEN_H / 2 + (int)round(gpsPy - centerPy);
+
+  double targetDx = targetPx - centerPx;
+  if (targetDx > worldPx / 2.0) targetDx -= worldPx;
+  if (targetDx < -worldPx / 2.0) targetDx += worldPx;
+  int tx = SCREEN_W / 2 + (int)round(targetDx);
+  int ty = SCREEN_H / 2 + (int)round(targetPy - centerPy);
+
+  bool gpsOnScreen = gx >= 0 && gx < SCREEN_W && gy >= 0 && gy < SCREEN_H;
+  bool targetOnScreen = tx >= 0 && tx < SCREEN_W && ty >= 0 && ty < SCREEN_H;
+
+#if NAV_TARGET_LINE_ENABLED
+  if (gpsOnScreen && targetOnScreen) {
+    cv.drawLine(gx - 1, gy, tx - 1, ty, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(gx + 1, gy, tx + 1, ty, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(gx, gy - 1, tx, ty - 1, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(gx, gy + 1, tx, ty + 1, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(gx, gy, tx, ty, MAP_NAV_LINE_COLOR);
+  }
+#endif
+
+  if (targetOnScreen) {
+    uint16_t col = st.arrived ? MAP_NAV_ARRIVED_COLOR : MAP_NAV_TARGET_COLOR;
+    cv.fillCircle(tx, ty, 8, MAP_NAV_OUTLINE_COLOR);
+    cv.drawCircle(tx, ty, 7, TFT_WHITE);
+    cv.fillCircle(tx, ty, 4, col);
+    cv.drawLine(tx - 7, ty, tx + 7, ty, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(tx, ty - 7, tx, ty + 7, MAP_NAV_OUTLINE_COLOR);
+    cv.drawLine(tx - 5, ty, tx + 5, ty, TFT_WHITE);
+    cv.drawLine(tx, ty - 5, tx, ty + 5, TFT_WHITE);
+  }
+
+  if (!gpsOnScreen) return;
+
+  int ox = gx;
+  int oy = gy;
+  float rad = st.bearingDeg * GEO_DEG_TO_RAD;
+  int ax = ox + (int)round(sinf(rad) * 22.0f);
+  int ay = oy - (int)round(cosf(rad) * 22.0f);
+  ax = constrain(ax, 8, SCREEN_W - 8);
+  ay = constrain(ay, 8, SCREEN_H - 18);
+  cv.drawLine(ox - 1, oy, ax - 1, ay, MAP_NAV_OUTLINE_COLOR);
+  cv.drawLine(ox + 1, oy, ax + 1, ay, MAP_NAV_OUTLINE_COLOR);
+  cv.drawLine(ox, oy - 1, ax, ay - 1, MAP_NAV_OUTLINE_COLOR);
+  cv.drawLine(ox, oy + 1, ax, ay + 1, MAP_NAV_OUTLINE_COLOR);
+  cv.drawLine(ox, oy, ax, ay, MAP_NAV_LINE_COLOR);
+  cv.fillTriangle(ax, ay,
+                  ax - (int)round(sinf(rad + 0.7f) * 8.0f),
+                  ay + (int)round(cosf(rad + 0.7f) * 8.0f),
+                  ax - (int)round(sinf(rad - 0.7f) * 8.0f),
+                  ay + (int)round(cosf(rad - 0.7f) * 8.0f),
+                  MAP_NAV_OUTLINE_COLOR);
+  cv.fillTriangle(ax, ay,
+                  ax - (int)round(sinf(rad + 0.7f) * 6.0f),
+                  ay + (int)round(cosf(rad + 0.7f) * 6.0f),
+                  ax - (int)round(sinf(rad - 0.7f) * 6.0f),
+                  ay + (int)round(cosf(rad - 0.7f) * 6.0f),
+                  MAP_NAV_LINE_COLOR);
 }
 
 void FnOfflineMap::_createWaypointFromCenter() {

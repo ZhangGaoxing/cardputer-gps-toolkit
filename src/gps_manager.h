@@ -51,7 +51,10 @@ public:
   float longitude()         { return (float)_gps.location.lng(); }
   float altitude()          { return _gps.altitude.isValid() ? (float)_gps.altitude.meters() : 0.0f; }
   float speedKmph()         { return (float)_gps.speed.kmph(); }
+  float speedMps()          { return (float)_gps.speed.mps(); }
   float courseDeg()         { return (float)_gps.course.deg(); }
+  bool speedValid()         { return _gps.speed.isValid() && _gps.speed.age() <= GPS_FIX_MAX_AGE_MS; }
+  bool courseValid()        { return _gps.course.isValid() && _gps.course.age() <= GPS_FIX_MAX_AGE_MS; }
   int   satellitesUsed() const;
 
   // UTC时间和日期

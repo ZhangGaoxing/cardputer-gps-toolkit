@@ -20,6 +20,7 @@
 #include "sub_functions/fn_world_map.h"
 #include "sub_functions/fn_offline_map.h"
 #include "sub_functions/fn_waypoint.h"
+#include "sub_functions/fn_goto_nav.h"
 #include "sub_functions/fn_nmea_monitor.h"
 #include "sub_functions/fn_settings.h"
 #include "sub_functions/fn_about.h"
@@ -39,6 +40,7 @@ void MenuSystem::begin() {
   _items.push_back(new FnWorldMap());
   _items.push_back(new FnOfflineMap());
   _items.push_back(new FnWaypoint());
+  _items.push_back(new FnGotoNav());
   _items.push_back(new FnNmeaMonitor());
   _items.push_back(new FnSettings());
   _items.push_back(new FnAbout());

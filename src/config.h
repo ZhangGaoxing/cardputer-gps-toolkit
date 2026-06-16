@@ -123,6 +123,16 @@
 #define WAYPOINT_BACKUP_ENABLED   1
 #define WAYPOINT_AUTO_SAVE        1
 
+// ==================================================================
+//  Go-to navigation parameters
+// ==================================================================
+#define NAV_ARRIVAL_RADIUS_M       20.0f
+#define NAV_MIN_SPEED_FOR_ETA_MPS   0.8f
+#define NAV_ETA_SMOOTHING_ALPHA     0.25f
+#define NAV_OFF_COURSE_ANGLE_DEG   35.0f
+#define NAV_TARGET_LINE_ENABLED     1
+#define NAV_PERSIST_TARGET_ENABLED  0
+
 // 坐标缩放因子（度 * 100 存储为 int16_t）
 #define COORD_SCALE 100
 
@@ -162,6 +172,7 @@ enum ScreenID {
   SCR_WORLD_MAP,
   SCR_OFFLINE_MAP,
   SCR_WAYPOINT,
+  SCR_GOTO_NAV,
   SCR_NMEA_MONITOR,
   SCR_SETTINGS,
   SCR_ABOUT,
@@ -180,6 +191,7 @@ enum IconType {
   ICON_WORLD_MAP,
   ICON_OFFLINE_MAP,
   ICON_WAYPOINT,
+  ICON_GOTO_NAV,
   ICON_NMEA,
   ICON_SETTINGS,
   ICON_ABOUT

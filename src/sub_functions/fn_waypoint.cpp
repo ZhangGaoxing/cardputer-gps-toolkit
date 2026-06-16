@@ -12,6 +12,7 @@
 #include "../display_manager.h"
 #include "../gps_manager.h"
 #include "../waypoint_manager.h"
+#include "../navigation_manager.h"
 #include "../sd_manager.h"
 #include "../ui_helpers.h"
 #include "../geo_math.h"
@@ -174,6 +175,15 @@ bool FnWaypoint::onKeyEvent(const KeyEvent& event) {
       if (event.key == 'd' || event.key == 'D') {
         _page = PAGE_DELETE_CONFIRM; _dirty = true; return true;
       }
+      if (event.key == 'g' || event.key == 'G') {
+        NavigationManager& nav = NavigationManager::instance();
+        if (nav.isTarget((uint16_t)_detailWpId)) {
+          nav.stop("Canceled");
+        } else {
+          nav.startGoto((uint16_t)_detailWpId);
+        }
+        _dirty = true; return true;
+      }
       return false;
     }
 
@@ -243,6 +253,7 @@ void FnWaypoint::_drawList() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   WaypointManager& wm = WaypointManager::instance();
   GPSManager& gps = GPSManager::instance();
+  NavigationManager& nav = NavigationManager::instance();
   size_t wpCount = wm.count();
 
   int y = 14, lh = 12;
@@ -309,6 +320,8 @@ void FnWaypoint::_drawList() {
 
     // 名称（截断到7字符）
     cv.setCursor(4, ry + 2);
+    cv.print(nav.isTarget(wp->id) ? ">" : " ");
+    cv.setCursor(10, ry + 2);
     char nb[WAYPOINT_NAME_MAX_LEN];
     strncpy(nb, wp->name, 7); nb[7] = '\0';
     cv.print(nb);
@@ -339,7 +352,7 @@ void FnWaypoint::_drawList() {
   // 底部操作提示
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[;][.]Nav  [Ent]View  [n]Add  [d]Del");
+  cv.print("[;][.]Move [Ent]View [n]Add [d]Del");
 
   // 加载错误
   if (wm.loadErrors() > 0) {
@@ -356,6 +369,7 @@ void FnWaypoint::_drawDetail() {
   M5Canvas& cv = DisplayManager::instance().canvas();
   WaypointManager& wm = WaypointManager::instance();
   GPSManager& gps = GPSManager::instance();
+  NavigationManager& nav = NavigationManager::instance();
 
   const Waypoint* wp = wm.getById(_detailWpId);
   if (!wp) { _page = PAGE_LIST; _dirty = true; return; }
@@ -369,6 +383,11 @@ void FnWaypoint::_drawDetail() {
   cv.setCursor(4, y);
   snprintf(buf, sizeof(buf), "Name: %s", wp->name);
   cv.print(buf); y += lh + 2;
+  if (nav.isTarget(wp->id)) {
+    cv.setTextColor(TFT_YELLOW);
+    cv.setCursor(142, 14);
+    cv.print("GO-TO");
+  }
 
   // 坐标
   cv.setTextColor(TFT_WHITE);
@@ -434,7 +453,8 @@ void FnWaypoint::_drawDetail() {
   // 底部操作提示
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[`]Back   [d]Delete");
+  cv.print(nav.isTarget(wp->id) ? "[g]Stop  [d]Delete  [`]Back"
+                                : "[g]Go-to [d]Delete  [`]Back");
 }
 
 // ==================================================================
@@ -528,6 +548,7 @@ void FnWaypoint::_drawDeleteConfirm() {
   const Waypoint* wp = (_detailWpId != 0)
     ? wm.getById(_detailWpId)
     : wm.getByIndex(_selectedIdx);
+  NavigationManager& nav = NavigationManager::instance();
 
   cv.setTextSize(1);
   cv.setTextColor(TFT_RED);
@@ -543,13 +564,19 @@ void FnWaypoint::_drawDeleteConfirm() {
   cv.setCursor(30, 70);
   cv.print("[y] Confirm delete");
 
+  if (wp && nav.isTarget(wp->id)) {
+    cv.setTextColor(TFT_YELLOW);
+    cv.setCursor(30, 98);
+    cv.print("Also stops Go-to");
+  }
+
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(30, 84);
   cv.print("[n] or [`] Cancel");
 
   if (wm.lastError()[0] != '\0') {
     cv.setTextColor(TFT_RED);
-    cv.setCursor(30, 98);
+    cv.setCursor(30, 112);
     cv.print(wm.lastError());
   }
 }
@@ -595,10 +622,14 @@ void FnWaypoint::_doDeleteSelected() {
     deleteId = _detailWpId;
   } else {
     const Waypoint* wp = wm.getByIndex(_selectedIdx);
+    deleteId = wp ? wp->id : 0;
     if (!wp) { _page = PAGE_LIST; _dirty = true; return; } // 防御性检查
     deleteId = wp->id;
   }
   if (wm.deleteWaypoint(deleteId)) {
+    if (NavigationManager::instance().isTarget(deleteId)) {
+      NavigationManager::instance().stop("Target deleted");
+    }
     _page = PAGE_LIST;
     _detailWpId = 0;
     if (_selectedIdx >= (int)wm.count() && wm.count() > 0) {
