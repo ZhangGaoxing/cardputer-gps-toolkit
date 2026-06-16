@@ -124,6 +124,16 @@
 #define WAYPOINT_AUTO_SAVE        1
 
 // ==================================================================
+//  SOS / Emergency parameters
+// ==================================================================
+#define SOS_LAST_FIX_WARN_AGE_MS           120000UL
+#define SOS_LAST_FIX_MAX_AGE_MS           1800000UL
+#define SOS_PAYLOAD_MAX_LEN                    220
+#define SOS_SHOW_DMS_COORDS                     1
+#define SOS_QUICK_ACCESS_ENABLED                1
+#define SOS_NEAREST_WAYPOINT_MAX_DISTANCE_M 5000.0f
+
+// ==================================================================
 //  Go-to navigation parameters
 // ==================================================================
 #define NAV_ARRIVAL_RADIUS_M       20.0f
@@ -173,10 +183,11 @@
 #define MENU_ANIM_DURATION 250  // 动画持续时间(ms)
 
 // ==================================================================
-//  屏幕ID枚举 (11个菜单项)
+//  屏幕ID枚举
 // ==================================================================
 enum ScreenID {
   SCR_GPS_DASHBOARD = 0,
+  SCR_SOS,
   SCR_SIGNAL_BARS,
   SCR_TRIP,
   SCR_BACKTRACK,
@@ -197,6 +208,7 @@ enum ScreenID {
 // ==================================================================
 enum IconType {
   ICON_DASHBOARD = 0,
+  ICON_SOS,
   ICON_SIGNAL_BARS,
   ICON_TRIP,
   ICON_BACKTRACK,

@@ -11,6 +11,7 @@ GPSManager& GPSManager::instance() {
 }
 
 void GPSManager::begin() {
+  _lastReliableFix = ReliableFixSnapshot();
   _openSerial();
 }
 
@@ -74,6 +75,9 @@ void GPSManager::update() {
   }
 
   _updateGpsState();
+  if (_gpsState == GPS_RELIABLE_FIX) {
+    _captureReliableFixSnapshot();
+  }
 }
 
 bool GPSManager::hasFix() const {
@@ -104,6 +108,11 @@ bool GPSManager::hasReliableFix() const {
 uint32_t GPSManager::fixAgeMs() const {
   if (!_gps.location.isValid()) return UINT32_MAX;
   return _gps.location.age();
+}
+
+uint32_t GPSManager::lastReliableFixAgeMs() const {
+  if (!_lastReliableFix.valid) return UINT32_MAX;
+  return millis() - _lastReliableFix.capturedAtMs;
 }
 
 bool GPSManager::hasRecentGnssData() const {
@@ -144,6 +153,27 @@ float GPSManager::vdop() const {
     return 99.9f;
   }
   return _vdop;
+}
+
+void GPSManager::_captureReliableFixSnapshot() {
+  _lastReliableFix.valid = true;
+  _lastReliableFix.lat = latitude();
+  _lastReliableFix.lon = longitude();
+  _lastReliableFix.altM = altitude();
+  _lastReliableFix.altValid = altitudeValid();
+  _lastReliableFix.hdop = hdop();
+  _lastReliableFix.satellitesUsed = satellitesUsed();
+  _lastReliableFix.fixQuality = fixQuality();
+  _lastReliableFix.fixMode = fixMode();
+  _lastReliableFix.timeValid = timeValid();
+  _lastReliableFix.dateValid = dateValid();
+  _lastReliableFix.year = utcYear();
+  _lastReliableFix.month = utcMonth();
+  _lastReliableFix.day = utcDay();
+  _lastReliableFix.hour = utcHour();
+  _lastReliableFix.minute = utcMinute();
+  _lastReliableFix.second = utcSecond();
+  _lastReliableFix.capturedAtMs = millis();
 }
 
 void GPSManager::_updateGpsState() {

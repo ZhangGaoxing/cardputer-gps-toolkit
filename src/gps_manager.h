@@ -29,6 +29,27 @@ struct GSVSequenceState {
   std::vector<int> currentVisible;
 };
 
+struct ReliableFixSnapshot {
+  bool valid = false;
+  float lat = 0.0f;
+  float lon = 0.0f;
+  float altM = 0.0f;
+  bool altValid = false;
+  float hdop = 99.9f;
+  int satellitesUsed = 0;
+  int fixQuality = 0;
+  int fixMode = 1;
+  bool timeValid = false;
+  bool dateValid = false;
+  int year = 0;
+  int month = 0;
+  int day = 0;
+  int hour = 0;
+  int minute = 0;
+  int second = 0;
+  uint32_t capturedAtMs = 0;
+};
+
 class GPSManager {
 public:
   static GPSManager& instance();
@@ -45,11 +66,15 @@ public:
   bool hasReliableFix() const;
   uint32_t fixAgeMs() const;
   bool hasRecentGnssData() const;
+  bool hasLastReliableFix() const { return _lastReliableFix.valid; }
+  uint32_t lastReliableFixAgeMs() const;
+  const ReliableFixSnapshot& lastReliableFix() const { return _lastReliableFix; }
 
   // 标准GPS数据存取器（非const，因为TinyGPSPlus内部会更新状态）
   float latitude()          { return (float)_gps.location.lat(); }
   float longitude()         { return (float)_gps.location.lng(); }
   float altitude()          { return _gps.altitude.isValid() ? (float)_gps.altitude.meters() : 0.0f; }
+  bool altitudeValid()      { return _gps.altitude.isValid() && _gps.altitude.age() <= GPS_FIX_MAX_AGE_MS; }
   float speedKmph()         { return (float)_gps.speed.kmph(); }
   float speedMps()          { return (float)_gps.speed.mps(); }
   float courseDeg()         { return (float)_gps.course.deg(); }
@@ -113,6 +138,7 @@ private:
   void _markUsedSatellite(const String& preferredSystem, int id);
   GSVSequenceState* _getGSVState(const String& system);
   void _storeSatellite(const SatData& sat);
+  void _captureReliableFixSnapshot();
   bool _hasRecentParsedNmea() const;
   void _updateGpsState();
 
@@ -145,6 +171,7 @@ private:
   bool _nmeaSerial = false;
   bool _satListSerial = false;
   unsigned long _lastGsaMillis = 0;
+  ReliableFixSnapshot _lastReliableFix;
 };
 
 #endif // GPS_MANAGER_H

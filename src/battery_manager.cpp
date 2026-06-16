@@ -10,15 +10,17 @@ BatteryManager& BatteryManager::instance() {
 }
 
 void BatteryManager::begin() {
-  _percentage = 100;
-  _lastRead = millis();
+  _readNow();
 }
 
 void BatteryManager::update() {
   unsigned long now = millis();
   if (now - _lastRead < READ_INTERVAL) return;
-  _lastRead = now;
+  _readNow();
+}
 
+void BatteryManager::_readNow() {
+  _lastRead = millis();
   // 使用M5Cardputer的电源管理API读取电量
   _percentage = M5Cardputer.Power.getBatteryLevel();
 

@@ -29,6 +29,8 @@ private:
   BatteryManager(const BatteryManager&) = delete;
   BatteryManager& operator=(const BatteryManager&) = delete;
 
+  void _readNow();
+
   int _percentage = 100;
   bool _charging = false;
   unsigned long _lastRead = 0;

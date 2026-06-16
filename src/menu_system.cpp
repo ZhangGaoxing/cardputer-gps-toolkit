@@ -13,6 +13,7 @@
 #include "status_bar.h"
 
 #include "sub_functions/fn_gps_dashboard.h"
+#include "sub_functions/fn_sos.h"
 #include "sub_functions/fn_signal_bars.h"
 #include "sub_functions/fn_trip.h"
 #include "sub_functions/fn_backtrack.h"
@@ -32,8 +33,9 @@ MenuSystem& MenuSystem::instance() {
 }
 
 void MenuSystem::begin() {
-  // 顺序: Dashboard, Signal, Trip, Clock, 3D Globe, World Map, Offline Map, Waypoint, NMEA, Settings, About
+  // 顺序与 ScreenID 保持一致
   _items.push_back(new FnGpsDashboard());
+  _items.push_back(new FnSos());
   _items.push_back(new FnSignalBars());
   _items.push_back(new FnTrip());
   _items.push_back(new FnBacktrack());
@@ -114,7 +116,7 @@ void MenuSystem::draw() {
   cv.setTextSize(1);
   cv.setTextColor(UI_TEXT);
   cv.setCursor(4, tipY + 4);
-  cv.print("[,]/[/] Nav  [Ent] Open  [`] Back");
+  cv.print("[,]/[/]Nav [Ent]Open [E]SOS");
 
   int currentIndex = _animating ? _animToIndex : _selectedIndex;
 
@@ -199,6 +201,14 @@ void MenuSystem::_drawMenuItem(int index, int cx, int cy, bool selected) {
 }
 
 bool MenuSystem::onKeyEvent(const KeyEvent& event) {
+  if (SOS_QUICK_ACCESS_ENABLED && event.held && (event.key == 'e' || event.key == 'E')) {
+    _animating = false;
+    _animDir = 0;
+    _selectedIndex = SCR_SOS;
+    enterFunction();
+    return true;
+  }
+
   if (!event.pressed) return false;
   if (event.key == ',')  { _navigateLeft();  return true; }
   if (event.key == '/')  { _navigateRight(); return true; }
