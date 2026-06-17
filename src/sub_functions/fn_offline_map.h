@@ -24,6 +24,7 @@ private:
   void _savePositionIfDue(bool force);
   void _drawMissingTilePlaceholder(int sx, int sy, int z, int x, int y, TileLoadStatus status);
   void _drawWaypoints();
+  void _drawPeerOverlay();
   void _drawNavigationOverlay();
   void _drawBacktrackOverlay();
   void _createWaypointFromCenter();
@@ -47,6 +48,8 @@ private:
   bool _lastBacktrackOffTrack = false;
   size_t _lastBacktrackTargetIndex = 0;
   float _lastBacktrackBearingDeg = NAN;
+  uint32_t _lastPeerChangeCounter = 0;
+  unsigned long _lastPeerRefreshMs = 0;
   bool _positionDirty = false;
   unsigned long _lastSaveMs = 0;
   unsigned long _lastWpFeedbackMs = 0;

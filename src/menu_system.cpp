@@ -21,6 +21,7 @@
 #include "sub_functions/fn_3d_globe.h"
 #include "sub_functions/fn_world_map.h"
 #include "sub_functions/fn_offline_map.h"
+#include "sub_functions/fn_peers.h"
 #include "sub_functions/fn_waypoint.h"
 #include "sub_functions/fn_goto_nav.h"
 #include "sub_functions/fn_nmea_monitor.h"
@@ -43,6 +44,7 @@ void MenuSystem::begin() {
   _items.push_back(new Fn3DGlobe());
   _items.push_back(new FnWorldMap());
   _items.push_back(new FnOfflineMap());
+  _items.push_back(new FnPeers());
   _items.push_back(new FnWaypoint());
   _items.push_back(new FnGotoNav());
   _items.push_back(new FnNmeaMonitor());

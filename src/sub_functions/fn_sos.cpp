@@ -3,6 +3,7 @@
 #include "../display_manager.h"
 #include "../emergency_info.h"
 #include "../geo_format.h"
+#include "../radio_manager.h"
 #include "../ui_helpers.h"
 
 #include <math.h>
@@ -76,6 +77,8 @@ uint16_t statusColor(const EmergencySnapshot& snapshot) {
 
 void FnSos::onEnter() {
   _page = 0;
+  _loraStatus[0] = '\0';
+  _loraStatusMs = 0;
 }
 
 void FnSos::onUpdate(bool force) {
@@ -102,6 +105,18 @@ bool FnSos::onKeyEvent(const KeyEvent& event) {
     return true;
   }
   if (event.key == 'r' || event.key == 'R') {
+    return true;
+  }
+  if (event.key == 'b' || event.key == 'B') {
+    bool ok = RadioManager::instance().startSosBroadcast("NEED_HELP");
+    if (ok) {
+      snprintf(_loraStatus, sizeof(_loraStatus), "LoRa SOS queued x%d", SOS_LORA_REPEAT_COUNT);
+    } else {
+      char err[64];
+      RadioManager::instance().getLastError(err, sizeof(err));
+      snprintf(_loraStatus, sizeof(_loraStatus), "LoRa failed: %.30s", err[0] ? err : "unavailable");
+    }
+    _loraStatusMs = millis();
     return true;
   }
   return false;
@@ -287,6 +302,8 @@ void FnSos::_drawPagePayload() {
   cv.printf("Len %u/%d", (unsigned)payloadLen, SOS_PAYLOAD_MAX_LEN);
   cv.setCursor(92, 16);
   cv.print(snapshot.positionExpired ? "STALE" : snapshot.gpsStatus);
+  cv.setCursor(168, 16);
+  cv.print("[b]LoRa");
 
   cv.drawRect(2, 26, SCREEN_W - 4, 70, UI_DIM);
   drawWrappedText(cv, 6, 32, 37, 5, payload, TFT_WHITE);
@@ -298,10 +315,21 @@ void FnSos::_drawPagePayload() {
 
   drawWrappedText(cv, 30, 104, 32, 2, snapshot.tipText, TFT_CYAN);
 
-  // cv.drawLine(2, 122, SCREEN_W - 3, 122, UI_DIM);
-  // cv.setTextColor(TFT_DARKGREY);
-  // cv.setCursor(4, 124);
-  // cv.print("[Tab/Ent]Page [r]Refresh [`]Back");
+  cv.drawLine(2, 122, SCREEN_W - 3, 122, UI_DIM);
+  RadioManager& radio = RadioManager::instance();
+  if (radio.sosBroadcastActive()) {
+    cv.setTextColor(TFT_GREEN);
+    cv.setCursor(4, 124);
+    cv.printf("LoRa %s rem %u", radio.lastTxStatus(), (unsigned)radio.sosRemaining());
+  } else if (_loraStatus[0] != '\0' && millis() - _loraStatusMs < 5000UL) {
+    cv.setTextColor(strstr(_loraStatus, "failed") ? TFT_ORANGE : TFT_GREEN);
+    cv.setCursor(4, 124);
+    cv.printf("%.38s", radio.lastTxStatus()[0] ? radio.lastTxStatus() : _loraStatus);
+  } else {
+    cv.setTextColor(TFT_DARKGREY);
+    cv.setCursor(4, 124);
+    cv.print("[b]Broadcast SOS  [Tab]Page");
+  }
 }
 
 void FnSos::drawIcon(int x, int y, int size, uint16_t color) {

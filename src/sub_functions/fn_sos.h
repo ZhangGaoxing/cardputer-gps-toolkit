@@ -14,6 +14,8 @@ public:
 
 private:
   int _page = 0;
+  char _loraStatus[48] = "";
+  unsigned long _loraStatusMs = 0;
   void _drawHeader(const char* title);
   void _drawPageCore();
   void _drawPageNav();

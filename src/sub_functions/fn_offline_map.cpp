@@ -8,6 +8,7 @@
 #include "../waypoint_manager.h"
 #include "../navigation_manager.h"
 #include "../backtrack_manager.h"
+#include "../peer_manager.h"
 #include "../geo_math.h"
 
 #include <math.h>
@@ -23,6 +24,9 @@ static const uint16_t MAP_NAV_OUTLINE_COLOR = TFT_BLACK;
 static const uint16_t MAP_BACKTRACK_LINE_COLOR = TFT_ORANGE;
 static const uint16_t MAP_BACKTRACK_TARGET_COLOR = TFT_YELLOW;
 static const uint16_t MAP_BACKTRACK_START_COLOR = TFT_GREEN;
+static const uint16_t MAP_PEER_COLOR = TFT_BLUE;
+static const uint16_t MAP_PEER_STALE_COLOR = TFT_DARKGREY;
+static const uint16_t MAP_PEER_SOS_COLOR = TFT_RED;
 static const double WEB_MERCATOR_MAX_LAT = 85.05112878;
 static const double OFFLINE_MAP_PI = 3.14159265358979323846;
 static const double OFFLINE_DEG_TO_RAD = 0.017453292519943295;
@@ -98,6 +102,8 @@ void FnOfflineMap::onEnter() {
   _lastBacktrackOffTrack = false;
   _lastBacktrackTargetIndex = 0;
   _lastBacktrackBearingDeg = NAN;
+  _lastPeerChangeCounter = PeerManager::instance().changeCounter();
+  _lastPeerRefreshMs = 0;
   _positionDirty = false;
   _lastSaveMs = 0;
   _lastWpFeedbackMs = 0;
@@ -159,6 +165,9 @@ bool FnOfflineMap::needsRedraw(unsigned long now) {
       angularDeltaDeg(btState.bearingDeg, _lastBacktrackBearingDeg) >= 2.0f) {
     return true;
   }
+
+  PeerManager& peers = PeerManager::instance();
+  if (peers.changeCounter() != _lastPeerChangeCounter) return true;
 
   GPSManager& gps = GPSManager::instance();
   bool hasReliableFix = gps.hasReliableFix();
@@ -286,8 +295,24 @@ void FnOfflineMap::onUpdate(bool force) {
 
   // 绘制航点标记
   _drawWaypoints();
+  _drawPeerOverlay();
   _drawBacktrackOverlay();
   _drawNavigationOverlay();
+
+  if (_hasGpsPosition) {
+    double gpsPx, gpsPy;
+    latLonToPixel(_gpsLat, _gpsLon, _zoom, gpsPx, gpsPy);
+    double worldPx = mapWorldPixels(_zoom);
+    double dx = gpsPx - centerPx;
+    if (dx > worldPx / 2.0) dx -= worldPx;
+    if (dx < -worldPx / 2.0) dx += worldPx;
+    int mx = SCREEN_W / 2 + (int)round(dx);
+    int my = SCREEN_H / 2 + (int)round(gpsPy - centerPy);
+    if (mx >= 0 && mx < SCREEN_W && my >= 0 && my < SCREEN_H) {
+      cv.fillCircle(mx, my, 4, TFT_WHITE);
+      cv.fillCircle(mx, my, 2, TFT_RED);
+    }
+  }
 
   // 航点操作反馈
   if (_wpFeedback[0] != '\0') {
@@ -336,6 +361,8 @@ void FnOfflineMap::onUpdate(bool force) {
     _lastBacktrackTargetIndex = btState.targetIndex;
     _lastBacktrackBearingDeg = btState.dataAvailable ? btState.bearingDeg : NAN;
   }
+  _lastPeerChangeCounter = PeerManager::instance().changeCounter();
+  _lastPeerRefreshMs = millis();
 }
 
 bool FnOfflineMap::onKeyEvent(const KeyEvent& event) {
@@ -535,6 +562,59 @@ void FnOfflineMap::_drawWaypoints() {
       cv.setTextColor(wptFill);
       cv.setCursor(sx + 5, sy - 4);
       cv.print(shortName);
+    }
+  }
+}
+
+void FnOfflineMap::_drawPeerOverlay() {
+  PeerManager& peers = PeerManager::instance();
+  if (peers.count() == 0 || !_hasPosition) return;
+
+  M5Canvas& cv = DisplayManager::instance().canvas();
+  double centerPx, centerPy;
+  latLonToPixel(_lat, _lon, _zoom, centerPx, centerPy);
+  double worldPx = mapWorldPixels(_zoom);
+  unsigned long now = millis();
+
+  for (size_t i = 0; i < peers.count(); i++) {
+    const RemoteDevice* peer = peers.getByIndex(i);
+    if (!peer || !peer->hasPosition) continue;
+
+    double px, py;
+    latLonToPixel(peer->lat, peer->lon, _zoom, px, py);
+    double dx = px - centerPx;
+    if (dx > worldPx / 2.0) dx -= worldPx;
+    if (dx < -worldPx / 2.0) dx += worldPx;
+
+    int sx = SCREEN_W / 2 + (int)round(dx);
+    int sy = SCREEN_H / 2 + (int)round(py - centerPy);
+    if (sx < 4 || sx > SCREEN_W - 5 || sy < 4 || sy > SCREEN_H - 16) continue;
+
+    bool stale = peers.isStale(*peer, now);
+    uint16_t col = peer->sosActive ? MAP_PEER_SOS_COLOR :
+                   (stale ? MAP_PEER_STALE_COLOR : MAP_PEER_COLOR);
+
+    cv.fillCircle(sx, sy, 6, TFT_BLACK);
+    if (peer->sosActive) {
+      cv.drawTriangle(sx, sy - 7, sx - 6, sy + 5, sx + 6, sy + 5, TFT_WHITE);
+      cv.fillTriangle(sx, sy - 5, sx - 4, sy + 3, sx + 4, sy + 3, col);
+    } else {
+      cv.drawCircle(sx, sy, 5, TFT_WHITE);
+      cv.fillCircle(sx, sy, 3, col);
+    }
+
+    char label[5] = "";
+    strncpy(label, peer->deviceId, 4);
+    label[4] = '\0';
+    cv.setTextSize(1);
+    int tw = strlen(label) * 6 + (stale ? 8 : 2);
+    cv.fillRect(sx + 5, sy - 5, tw, 9, TFT_BLACK);
+    cv.setTextColor(col);
+    cv.setCursor(sx + 6, sy - 4);
+    cv.print(label);
+    if (stale) {
+      cv.setTextColor(TFT_ORANGE);
+      cv.print("S");
     }
   }
 }

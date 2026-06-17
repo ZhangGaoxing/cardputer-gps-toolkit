@@ -16,6 +16,8 @@
 #include "waypoint_manager.h"
 #include "navigation_manager.h"
 #include "backtrack_manager.h"
+#include "radio_manager.h"
+#include "peer_manager.h"
 
 class EscInterceptor : public IKeyListener {
 public:
@@ -58,6 +60,8 @@ void setup() {
   WaypointManager::instance().begin();
   NavigationManager::instance().begin();
   BacktrackManager::instance().begin();
+  PeerManager::instance().begin();
+  RadioManager::instance().begin();
 
   MenuSystem::instance().begin();
   KeyboardManager::instance().setListener(&MenuSystem::instance());
@@ -127,6 +131,14 @@ void loop() {
   }
 
   BacktrackManager::instance().update();
+  RadioManager::instance().update();
+  {
+    RadioPacket packet;
+    if (RadioManager::instance().readReceivedPacket(packet)) {
+      PeerManager::instance().updateFromPacket(packet);
+    }
+  }
+  PeerManager::instance().update();
 
   KeyboardManager::instance().scan();
   unsigned long now = millis();

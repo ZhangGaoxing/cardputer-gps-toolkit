@@ -26,6 +26,37 @@
 #define SD_SPI_FREQ_SAFE   4000000U
 
 // ==================================================================
+//  LoRa / Mesh position sharing parameters
+// ==================================================================
+// Defaults follow M5Stack's Cardputer ADV CAP LoRa868/SX1262 demo.
+// Confirm the legal regional frequency before transmitting.
+#define RADIO_ENABLED                         1
+#define RADIO_USE_RADIOLIB                    1
+#define RADIO_FREQUENCY                       868.0f
+#define RADIO_BANDWIDTH                       500.0f
+#define RADIO_SPREADING_FACTOR                7
+#define RADIO_CODING_RATE                     5
+#define RADIO_TX_POWER                        10
+#define RADIO_SYNC_WORD                       0x34
+#define RADIO_PREAMBLE_LENGTH                 10
+#define RADIO_TCXO_VOLTAGE                    3.0f
+#define RADIO_NSS_PIN                         LORA_CS_PIN
+#define RADIO_DIO1_PIN                        4
+#define RADIO_RST_PIN                         3
+#define RADIO_BUSY_PIN                        6
+#define RADIO_POSITION_BROADCAST_ENABLED      1
+#define RADIO_BROADCAST_INTERVAL_MS           30000UL
+#define RADIO_BROADCAST_INTERVAL_LOW_POWER_MS 120000UL
+#define RADIO_ALLOW_LAST_KNOWN_BROADCAST      1
+#define RADIO_LAST_KNOWN_MAX_AGE_MS           SOS_LAST_FIX_MAX_AGE_MS
+#define RADIO_MAX_PACKET_LEN                  180
+#define PEER_MAX_COUNT                        12
+#define PEER_STALE_TIMEOUT_MS                 120000UL
+#define PEER_LOST_TIMEOUT_MS                  600000UL
+#define SOS_LORA_REPEAT_COUNT                 3
+#define SOS_LORA_REPEAT_INTERVAL_MS           1500UL
+
+// ==================================================================
 //  显示屏参数
 // ==================================================================
 #define SCREEN_W     240
@@ -195,6 +226,7 @@ enum ScreenID {
   SCR_3D_GLOBE,
   SCR_WORLD_MAP,
   SCR_OFFLINE_MAP,
+  SCR_PEERS,
   SCR_WAYPOINT,
   SCR_GOTO_NAV,
   SCR_NMEA_MONITOR,
@@ -216,6 +248,7 @@ enum IconType {
   ICON_3D_GLOBE,
   ICON_WORLD_MAP,
   ICON_OFFLINE_MAP,
+  ICON_PEERS,
   ICON_WAYPOINT,
   ICON_GOTO_NAV,
   ICON_NMEA,
