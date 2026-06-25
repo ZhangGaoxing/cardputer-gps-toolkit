@@ -168,16 +168,28 @@ bool BacktrackManager::loadFromGpx(const char* path) {
     BACKTRACK_MIN_POINT_DISTANCE_M * 1.5f,
     BACKTRACK_MIN_POINT_DISTANCE_M * 2.0f,
     BACKTRACK_MIN_POINT_DISTANCE_M * 3.0f,
-    BACKTRACK_MIN_POINT_DISTANCE_M * 5.0f
+    BACKTRACK_MIN_POINT_DISTANCE_M * 5.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 8.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 12.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 20.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 32.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 50.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 80.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 125.0f,
+    BACKTRACK_MIN_POINT_DISTANCE_M * 200.0f
   };
 
   size_t parsedPoints = 0;
   bool loaded = false;
-  for (size_t i = 0; i < sizeof(tries) / sizeof(tries[0]); i++) {
-    parsedPoints = 0;
-    if (_loadGpxSimplified(path, tries[i], parsedPoints)) {
-      loaded = true;
-      break;
+
+  for (uint8_t pass = 0; pass < 2 && !loaded; pass++) {
+    bool keepTurns = (pass == 0);
+    for (size_t i = 0; i < sizeof(tries) / sizeof(tries[0]); i++) {
+      parsedPoints = 0;
+      if (_loadGpxSimplified(path, tries[i], keepTurns, parsedPoints)) {
+        loaded = true;
+        break;
+      }
     }
   }
 
@@ -422,7 +434,7 @@ bool BacktrackManager::_copySimplified(float minDistanceM) {
 }
 
 bool BacktrackManager::_loadGpxSimplified(const char* path, float minDistanceM,
-                                          size_t& parsedPoints) {
+                                          bool keepTurns, size_t& parsedPoints) {
   parsedPoints = 0;
   _pointCount = 0;
   memset(_points, 0, sizeof(_points));
@@ -453,7 +465,7 @@ bool BacktrackManager::_loadGpxSimplified(const char* path, float minDistanceM,
 
     parsedPoints++;
     nextSegmentStart = false;
-    if (!_appendGpxCandidate(point, pending, hasPending, minDistanceM)) {
+    if (!_appendGpxCandidate(point, pending, hasPending, minDistanceM, keepTurns)) {
       overflow = true;
       break;
     }
@@ -479,7 +491,8 @@ bool BacktrackManager::_appendPoint(const TrackPoint& point) {
 bool BacktrackManager::_appendGpxCandidate(const TrackPoint& point,
                                            TrackPoint& pending,
                                            bool& hasPending,
-                                           float minDistanceM) {
+                                           float minDistanceM,
+                                           bool keepTurns) {
   if (!_isValidCoordinate(point.lat, point.lon)) return true;
 
   if (_pointCount == 0) {
@@ -504,7 +517,7 @@ bool BacktrackManager::_appendGpxCandidate(const TrackPoint& point,
   float distFromLastM = geoDistanceKm(lastKept.lat, lastKept.lon,
                                       pending.lat, pending.lon) * 1000.0f;
   bool keep = distFromLastM >= minDistanceM ||
-              _shouldKeepTurn(lastKept, pending, point);
+              (keepTurns && _shouldKeepTurn(lastKept, pending, point));
   if (keep && !_appendPoint(pending)) {
     return false;
   }

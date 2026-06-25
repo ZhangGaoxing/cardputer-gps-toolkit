@@ -365,10 +365,11 @@ void FnTrip::_drawRecord() {
 
   cv.setTextColor(TFT_WHITE);
   cv.setCursor(4, y);
-  snprintf(buf, sizeof(buf), "REC:%s  SD:%s  GPS:%s",
+  snprintf(buf, sizeof(buf), "REC:%s SD:%s GPS:%s Int:%s",
            recording ? "ON" : "OFF",
            sdOk ? "OK" : "NO",
-           gpsOk ? "TIME" : "WAIT");
+           gpsOk ? "TIME" : "WAIT",
+           gw.recordIntervalLabel());
   cv.print(buf); y += lh;
 
   if (showGpxError) {

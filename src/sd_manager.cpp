@@ -435,6 +435,7 @@ bool SDManager::saveDisplaySettings(const DisplaySettingsData& settings) {
   state.hasDisplaySettings = true;
   state.displaySettings.brightnessLevel = settings.brightnessLevel;
   state.displaySettings.sleepTimeoutIndex = settings.sleepTimeoutIndex;
+  state.displaySettings.gpxRecordIntervalIndex = settings.gpxRecordIntervalIndex;
   return _saveIniState(state);
 }
 
@@ -477,14 +478,22 @@ bool SDManager::_loadIniState(IniState& state) {
     if (line.startsWith("DISPLAY=")) {
       String body = line.substring(8);
       int d1 = body.indexOf(',');
+      int d2 = body.indexOf(',', d1 + 1);
       if (d1 < 0) continue;
       int brightness = body.substring(0, d1).toInt();
-      int sleep = body.substring(d1 + 1).toInt();
+      int sleep = (d2 >= 0)
+                    ? body.substring(d1 + 1, d2).toInt()
+                    : body.substring(d1 + 1).toInt();
+      int gpxInterval = (d2 >= 0)
+                          ? body.substring(d2 + 1).toInt()
+                          : GPX_RECORD_INTERVAL_DEFAULT_INDEX;
       if (brightness >= 0 && brightness < BRIGHTNESS_LEVEL_COUNT &&
-          sleep >= 0 && sleep < SLEEP_TIMEOUT_COUNT) {
+          sleep >= 0 && sleep < SLEEP_TIMEOUT_COUNT &&
+          gpxInterval >= 0 && gpxInterval < GPX_RECORD_INTERVAL_OPTION_COUNT) {
         state.hasDisplaySettings = true;
         state.displaySettings.brightnessLevel = (uint8_t)brightness;
         state.displaySettings.sleepTimeoutIndex = (uint8_t)sleep;
+        state.displaySettings.gpxRecordIntervalIndex = (uint8_t)gpxInterval;
       }
     }
   }
@@ -507,9 +516,10 @@ bool SDManager::_saveIniState(const IniState& state) {
     f.printf("POS=%.6f,%.6f,%d\n", state.lat, state.lon, state.zoom);
   }
   if (state.hasDisplaySettings) {
-    f.printf("DISPLAY=%u,%u\n",
+    f.printf("DISPLAY=%u,%u,%u\n",
              (unsigned)state.displaySettings.brightnessLevel,
-             (unsigned)state.displaySettings.sleepTimeoutIndex);
+             (unsigned)state.displaySettings.sleepTimeoutIndex,
+             (unsigned)state.displaySettings.gpxRecordIntervalIndex);
   }
 
   f.close();

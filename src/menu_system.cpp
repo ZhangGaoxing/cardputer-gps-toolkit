@@ -11,6 +11,7 @@
 #include "menu_system.h"
 #include "display_manager.h"
 #include "status_bar.h"
+#include "ui_helpers.h"
 
 #include "sub_functions/fn_gps_dashboard.h"
 #include "sub_functions/fn_sos.h"
@@ -190,7 +191,7 @@ void MenuSystem::_drawMenuItem(int index, int cx, int cy, bool selected) {
   int iconX = cx - iconSize / 2;
   int iconY = cy - iconSize / 2;
 
-  item->drawIcon(iconX, iconY, iconSize, iconColor);
+  drawMenuIcon(cv, item->iconType(), iconX, iconY, iconSize, iconColor);
 
   // 选中项大号字体
   if (selected) {

@@ -80,6 +80,7 @@ enum TileLoadStatus {
 struct DisplaySettingsData {
   uint8_t brightnessLevel = 1;
   uint8_t sleepTimeoutIndex = 1;
+  uint8_t gpxRecordIntervalIndex = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
 };
 
 class SDManager {

@@ -6,6 +6,11 @@
 #define UI_HELPERS_H
 
 #include <M5Cardputer.h>
+#include "config.h"
+
+/** Draw the unified solid-style main menu icon. */
+void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
+                  uint16_t color, uint16_t bgColor = UI_BG);
 
 /** 卫星系统→颜色映射 */
 uint16_t systemColor(const String& sys);

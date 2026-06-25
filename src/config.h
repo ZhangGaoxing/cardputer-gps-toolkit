@@ -75,6 +75,8 @@
 #define GPX_RECOVERY_ENABLED       1
 #define GPX_FLUSH_INTERVAL_MS      5000
 #define GPX_FLUSH_EVERY_N_POINTS   3
+#define GPX_RECORD_INTERVAL_OPTION_COUNT 6
+#define GPX_RECORD_INTERVAL_DEFAULT_INDEX 1
 
 // ==================================================================
 //  NMEA 监视器参数

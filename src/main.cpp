@@ -44,6 +44,7 @@ void setup() {
   if (SDManager::instance().begin() && SDManager::instance().loadDisplaySettings(displaySettings)) {
     DisplayManager::instance().setBrightnessLevel(displaySettings.brightnessLevel);
     DisplayManager::instance().setSleepTimeoutIndex(displaySettings.sleepTimeoutIndex);
+    GpxWriter::instance().setRecordIntervalIndex(displaySettings.gpxRecordIntervalIndex);
   }
 
   DisplayManager::instance().begin();
@@ -104,29 +105,49 @@ void loop() {
   );
 
   GpxWriter& gw = GpxWriter::instance();
-  if (gw.isRecording() && hasReliableFix && tripPointAccepted) {
+  static bool gpxWasRecording = false;
+  static unsigned long lastGpxPointMs = 0;
+
+  if (!gw.isRecording()) {
+    gpxWasRecording = false;
+    lastGpxPointMs = 0;
+  } else {
+    unsigned long gpxNow = millis();
+    if (!gpxWasRecording) {
+      gpxWasRecording = true;
+      lastGpxPointMs = 0;
+    }
+
     TripTracker& trk = TripTracker::instance();
-    GpxTrackPoint point;
-    point.lat = gps.latitude();
-    point.lon = gps.longitude();
-    point.altM = gps.altitude();
-    point.speedKmph = gps.speedKmph();
-    point.courseDeg = gps.courseDeg();
-    point.hdop = gps.hdop();
-    point.pdop = gps.pdop();
-    point.vdop = gps.vdop();
-    point.satellites = gps.satellitesUsed();
-    point.fixMode = gps.fixMode();
-    point.fixQuality = gps.fixQuality();
-    point.year = gps.utcYear();
-    point.month = gps.utcMonth();
-    point.day = gps.utcDay();
-    point.hour = gps.utcHour();
-    point.minute = gps.utcMinute();
-    point.second = (float)gps.utcSecond();
-    if ((!trk.lastAcceptedStartedSegment() || gw.startNewSegment()) &&
-        !gw.appendTrackPoint(point)) {
-      // GpxWriter moves itself to Error and exposes lastError() for the UI.
+    bool segmentStart = tripPointAccepted && trk.lastAcceptedStartedSegment();
+    bool intervalDue = lastGpxPointMs == 0 ||
+                       gpxNow - lastGpxPointMs >= gw.recordIntervalMs();
+
+    if (hasReliableFix && !trk.lastUpdateRejected() && (segmentStart || intervalDue)) {
+      GpxTrackPoint point;
+      point.lat = gps.latitude();
+      point.lon = gps.longitude();
+      point.altM = gps.altitude();
+      point.speedKmph = gps.speedKmph();
+      point.courseDeg = gps.courseDeg();
+      point.hdop = gps.hdop();
+      point.pdop = gps.pdop();
+      point.vdop = gps.vdop();
+      point.satellites = gps.satellitesUsed();
+      point.fixMode = gps.fixMode();
+      point.fixQuality = gps.fixQuality();
+      point.year = gps.utcYear();
+      point.month = gps.utcMonth();
+      point.day = gps.utcDay();
+      point.hour = gps.utcHour();
+      point.minute = gps.utcMinute();
+      point.second = (float)gps.utcSecond();
+
+      if ((!segmentStart || gw.startNewSegment()) && gw.appendTrackPoint(point)) {
+        lastGpxPointMs = gpxNow;
+      } else {
+        // GpxWriter moves itself to Error and exposes lastError() for the UI.
+      }
     }
   }
 

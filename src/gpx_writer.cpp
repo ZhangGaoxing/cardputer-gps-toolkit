@@ -17,9 +17,45 @@ static const char* GPX_SEGMENT_BREAK =
   "    </trkseg>\r\n"
   "    <trkseg>\r\n";
 
+static const unsigned long GPX_RECORD_INTERVAL_MS_OPTIONS[] = {
+  1000UL, 2000UL, 5000UL, 10000UL, 30000UL, 60000UL
+};
+
+static const char* GPX_RECORD_INTERVAL_LABELS[] = {
+  "1s", "2s", "5s", "10s", "30s", "60s"
+};
+
+static_assert(
+  sizeof(GPX_RECORD_INTERVAL_MS_OPTIONS) / sizeof(GPX_RECORD_INTERVAL_MS_OPTIONS[0]) ==
+    GPX_RECORD_INTERVAL_OPTION_COUNT,
+  "GPX interval option count mismatch");
+
 GpxWriter& GpxWriter::instance() {
   static GpxWriter gw;
   return gw;
+}
+
+void GpxWriter::setRecordIntervalIndex(uint8_t index) {
+  if (index >= GPX_RECORD_INTERVAL_OPTION_COUNT) {
+    index = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
+  }
+  _recordIntervalIndex = index;
+}
+
+unsigned long GpxWriter::recordIntervalMs() const {
+  uint8_t index = _recordIntervalIndex;
+  if (index >= GPX_RECORD_INTERVAL_OPTION_COUNT) {
+    index = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
+  }
+  return GPX_RECORD_INTERVAL_MS_OPTIONS[index];
+}
+
+const char* GpxWriter::recordIntervalLabel() const {
+  uint8_t index = _recordIntervalIndex;
+  if (index >= GPX_RECORD_INTERVAL_OPTION_COUNT) {
+    index = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
+  }
+  return GPX_RECORD_INTERVAL_LABELS[index];
 }
 
 bool GpxWriter::begin() {

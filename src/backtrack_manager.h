@@ -70,10 +70,12 @@ private:
 
   bool _buildSnapshotFromTrip();
   bool _copySimplified(float minDistanceM);
-  bool _loadGpxSimplified(const char* path, float minDistanceM, size_t& parsedPoints);
+  bool _loadGpxSimplified(const char* path, float minDistanceM,
+                          bool keepTurns, size_t& parsedPoints);
   bool _appendPoint(const TrackPoint& point);
   bool _appendGpxCandidate(const TrackPoint& point, TrackPoint& pending,
-                           bool& hasPending, float minDistanceM);
+                           bool& hasPending, float minDistanceM,
+                           bool keepTurns);
   bool _shouldKeepTurn(const TrackPoint& prev, const TrackPoint& cur,
                        const TrackPoint& next) const;
   void _computeCumulativeDistance();

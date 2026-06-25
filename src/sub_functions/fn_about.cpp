@@ -25,7 +25,7 @@ void FnAbout::onUpdate(bool force) {
   // ——— 版本 ———
   cv.setTextColor(TFT_GREEN);
   cv.setCursor(60, y);
-  cv.print("v0.0.1");
+  cv.print("v1.0.0");
   y += lh + 4;
 
   // ——— 分隔线 ———

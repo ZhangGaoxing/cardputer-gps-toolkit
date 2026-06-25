@@ -10,6 +10,7 @@
 #include <Arduino.h>
 #include <SD.h>
 #include <FS.h>
+#include "config.h"
 
 enum class GpxWriterState {
   Idle,
@@ -59,6 +60,11 @@ public:
   bool startNewSegment();
   bool appendTrackPoint(const GpxTrackPoint& point);
 
+  void setRecordIntervalIndex(uint8_t index);
+  uint8_t recordIntervalIndex() const { return _recordIntervalIndex; }
+  unsigned long recordIntervalMs() const;
+  const char* recordIntervalLabel() const;
+
   int pointCount() const { return _pointCount; }
   unsigned long recordingStartMs() const { return _recordingStartMs; }
   const char* currentFileName() const { return _fileName; }
@@ -104,6 +110,7 @@ private:
   size_t _bytesWritten = 0;
   unsigned long _recordingStartMs = 0;
   unsigned long _lastFlushMs = 0;
+  uint8_t _recordIntervalIndex = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
 };
 
 #endif
