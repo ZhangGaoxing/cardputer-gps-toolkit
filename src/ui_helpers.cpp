@@ -311,6 +311,40 @@ void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
       break;
     }
 
+    case ICON_TWILIGHT: {
+      // 日出图标：地平线 + 上升半圆 + 三条光芒
+      int hY = cy + unit(s, 12);   // 地平线位置（中心偏下）
+      int r  = unit(s, 22);        // 太阳半径
+
+      // 地平线（两段，中间留出太阳）
+      cv.fillRect(px(x, s, 8),  hY - 1, cx - r - 2 - px(x, s, 8),        3, color);
+      cv.fillRect(cx + r + 2,   hY - 1, px(x, s, 92) - (cx + r + 2),     3, color);
+
+      // 上半圆太阳（地平线以上）
+      cv.fillCircle(cx, hY, r, color);
+      cv.fillRect(px(x, s, 8), hY + 1, unit(s, 84), r + 4, bgColor);  // 遮掉下半
+
+      // 内圆镂空
+      cv.fillCircle(cx, hY, unit(s, 12), bgColor);
+
+      // 光芒（3 条）
+      int rayInner = r + unit(s, 5);
+      int rayOuter = r + unit(s, 14);
+      // 正上方
+      cv.drawLine(cx, hY - rayInner, cx, hY - rayOuter, color);
+      cv.drawLine(cx + 1, hY - rayInner, cx + 1, hY - rayOuter, color);
+      // 左上 45°
+      float a45 = 0.7854f;
+      int lx1 = cx - (int)(sinf(a45) * rayInner), ly1 = hY - (int)(cosf(a45) * rayInner);
+      int lx2 = cx - (int)(sinf(a45) * rayOuter), ly2 = hY - (int)(cosf(a45) * rayOuter);
+      cv.drawLine(lx1, ly1, lx2, ly2, color);
+      // 右上 45°
+      int rx1 = cx + (int)(sinf(a45) * rayInner);
+      int rx2 = cx + (int)(sinf(a45) * rayOuter);
+      cv.drawLine(rx1, ly1, rx2, ly2, color);
+      break;
+    }
+
     default:
       cv.fillCircle(cx, cy, unit(s, 32), color);
       break;

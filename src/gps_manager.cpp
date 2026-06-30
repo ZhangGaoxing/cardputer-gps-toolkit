@@ -47,7 +47,9 @@ void GPSManager::_closeSerial() {
 // ==================================================================
 
 void GPSManager::update() {
-  static String nmeaLine = "";
+  // 固定尺寸行缓冲，消除逐字符 String += 导致的堆碎片化
+  static char nmeaLineBuf[NMEA_BUF_WIDTH] = {};
+  static int  nmeaLineLen = 0;
   bool gotValidChar = false;
 
   // 超时检测
@@ -63,10 +65,11 @@ void GPSManager::update() {
     if (c != '\r' && c != '\n') gotValidChar = true;
 
     if (c == '\n') {
-      _nmeaDispatcher(nmeaLine);
-      nmeaLine = "";
+      nmeaLineBuf[nmeaLineLen] = '\0';
+      _nmeaDispatcher(nmeaLineBuf);
+      nmeaLineLen = 0;
     } else if (c != '\r') {
-      nmeaLine += c;
+      if (nmeaLineLen < NMEA_BUF_WIDTH - 1) nmeaLineBuf[nmeaLineLen++] = c;
     }
   }
 
@@ -77,6 +80,18 @@ void GPSManager::update() {
   _updateGpsState();
   if (_gpsState == GPS_RELIABLE_FIX) {
     _captureReliableFixSnapshot();
+  }
+
+  // 信号长时间丢失后清除陈旧卫星列表（>60s 无 GNSS 数据）
+  if (!hasRecentGnssData()) {
+    if (_satPurgeCheckMs == 0) {
+      _satPurgeCheckMs = millis();
+    } else if (millis() - _satPurgeCheckMs >= 60000UL) {
+      purgeStaleSatellites();
+      _satPurgeCheckMs = 0;
+    }
+  } else {
+    _satPurgeCheckMs = 0;
   }
 }
 
@@ -189,102 +204,131 @@ void GPSManager::_updateGpsState() {
 }
 
 // ==================================================================
-//  NMEA分发和解析
+//  NMEA 分发和解析
 // ==================================================================
 
-void GPSManager::_nmeaDispatcher(const String& line) {
+// NMEA 校验和验证（改进 B）
+// 格式: $...*HH — 从 '$' 后到 '*' 前的所有字节异或结果需等于 HH
+static bool verifyNmeaChecksum(const char* sentence) {
+  if (!sentence || sentence[0] != '$') return false;
+  const char* star = strchr(sentence + 1, '*');
+  if (!star || star[1] == '\0' || star[2] == '\0') return false;
+  uint8_t expected = 0;
+  for (const char* p = sentence + 1; p < star; p++) expected ^= (uint8_t)*p;
+  char hexBuf[3] = { star[1], star[2], '\0' };
+  char* endPtr = nullptr;
+  uint8_t got = (uint8_t)strtol(hexBuf, &endPtr, 16);
+  if (endPtr != hexBuf + 2) return false;
+  return expected == got;
+}
+
+// 字段提取辅助（改进 A：不分配 String，直接填充栈上缓冲）
+// 返回字段长度；字段不存在时返回 0 并将 out[0] 置 '\0'
+static int getFieldBuf(const char* line, int num, char* out, int outSize) {
+  if (!out || outSize == 0) return 0;
+  out[0] = '\0';
+  int field = 0;
+  const char* start = line;
+  for (const char* p = line; ; p++) {
+    char ch = *p;
+    if (ch == ',' || ch == '*' || ch == '\0') {
+      if (field == num) {
+        int len = (int)(p - start);
+        if (len >= outSize) len = outSize - 1;
+        if (len > 0) memcpy(out, start, len);
+        out[len] = '\0';
+        return len;
+      }
+      field++;
+      start = p + 1;
+      if (ch == '\0' || ch == '*') break;
+    }
+  }
+  return 0;
+}
+
+void GPSManager::_nmeaDispatcher(const char* line) {
+  if (!line || line[0] == '\0') return;
   if (_nmeaSerial) Serial.println(line);
 
-  String trimmed = line;
-  trimmed.trim();
+  // NMEA 句子必须以 '$' 开头
+  if (line[0] != '$') return;
 
-  // 存入NMEA环形缓冲
-  if (trimmed.length() > 0 && trimmed[0] == '$') {
-    _lastNmeaMillis = millis();
-    strncpy(_nmeaBuf[_nmeaBufHead], trimmed.c_str(), NMEA_BUF_WIDTH - 1);
-    _nmeaBuf[_nmeaBufHead][NMEA_BUF_WIDTH - 1] = '\0';
-    _nmeaBufHead = (_nmeaBufHead + 1) % NMEA_BUF_LINES;
-    if (_nmeaBufCount < NMEA_BUF_LINES) _nmeaBufCount++;
-  }
+  // 校验和验证：拒绝损坏的句子，防止串口噪声写入错误数据
+  if (!verifyNmeaChecksum(line)) return;
 
-  // 按前缀分发到对应解析器
-  struct { const char* prefix; void (GPSManager::*parser)(const String&); } handlers[] = {
-    {"$GPGSV", &GPSManager::_parseGSV},
-    {"$GLGSV", &GPSManager::_parseGSV},
-    {"$GAGSV", &GPSManager::_parseGSV},
-    {"$BDGSV", &GPSManager::_parseGSV},
-    {"$GQGSV", &GPSManager::_parseGSV},
-    {"$GNGSV", &GPSManager::_parseGSV},
-    {"$GPGSA", &GPSManager::_parseGSA},
-    {"$GLGSA", &GPSManager::_parseGSA},
-    {"$GAGSA", &GPSManager::_parseGSA},
-    {"$BDGSA", &GPSManager::_parseGSA},
-    {"$GQGSA", &GPSManager::_parseGSA},
-    {"$GNGSA", &GPSManager::_parseGSA},
-    {"$GPGGA", &GPSManager::_parseGGA},
-    {"$GNGGA", &GPSManager::_parseGGA},
+  // 存入 NMEA 环形缓冲（供监视器页面显示）
+  _lastNmeaMillis = millis();
+  strncpy(_nmeaBuf[_nmeaBufHead], line, NMEA_BUF_WIDTH - 1);
+  _nmeaBuf[_nmeaBufHead][NMEA_BUF_WIDTH - 1] = '\0';
+  _nmeaBufHead = (_nmeaBufHead + 1) % NMEA_BUF_LINES;
+  if (_nmeaBufCount < NMEA_BUF_LINES) _nmeaBufCount++;
+
+  // 按前缀分发（使用 strncmp，不分配 String）
+  struct { const char* prefix; int prefixLen; void (GPSManager::*parser)(const char*); } handlers[] = {
+    {"$GPGSV", 6, &GPSManager::_parseGSV},
+    {"$GLGSV", 6, &GPSManager::_parseGSV},
+    {"$GAGSV", 6, &GPSManager::_parseGSV},
+    {"$BDGSV", 6, &GPSManager::_parseGSV},
+    {"$GQGSV", 6, &GPSManager::_parseGSV},
+    {"$GNGSV", 6, &GPSManager::_parseGSV},
+    {"$GPGSA", 6, &GPSManager::_parseGSA},
+    {"$GLGSA", 6, &GPSManager::_parseGSA},
+    {"$GAGSA", 6, &GPSManager::_parseGSA},
+    {"$BDGSA", 6, &GPSManager::_parseGSA},
+    {"$GQGSA", 6, &GPSManager::_parseGSA},
+    {"$GNGSA", 6, &GPSManager::_parseGSA},
+    {"$GPGGA", 6, &GPSManager::_parseGGA},
+    {"$GNGGA", 6, &GPSManager::_parseGGA},
   };
 
   for (auto& h : handlers) {
-    if (line.startsWith(h.prefix)) {
+    if (strncmp(line, h.prefix, h.prefixLen) == 0) {
       (this->*h.parser)(line);
       break;
     }
   }
 }
 
-// 字符串字段提取辅助函数
-static String getField(const String& line, int num) {
-  int field = 0, start = 0;
-  for (int i = 0; i <= (int)line.length(); i++) {
-    if (i == (int)line.length() || line[i] == ',' || line[i] == '*') {
-      if (field == num) return line.substring(start, i);
-      field++;
-      start = i + 1;
-    }
-  }
-  return "";
-}
-
-void GPSManager::_parseGSV(const String& line) {
-  String system;
-  if (line.startsWith("$GPGSV")) system = "GPS";
-  else if (line.startsWith("$GLGSV")) system = "GLONASS";
-  else if (line.startsWith("$GAGSV")) system = "Galileo";
-  else if (line.startsWith("$BDGSV")) system = "BeiDou";
-  else if (line.startsWith("$GQGSV")) system = "QZSS";
-  else if (line.startsWith("$GNGSV")) system = "Mixed";
+void GPSManager::_parseGSV(const char* line) {
+  const char* system;
+  if      (strncmp(line, "$GPGSV", 6) == 0) system = "GPS";
+  else if (strncmp(line, "$GLGSV", 6) == 0) system = "GLONASS";
+  else if (strncmp(line, "$GAGSV", 6) == 0) system = "Galileo";
+  else if (strncmp(line, "$BDGSV", 6) == 0) system = "BeiDou";
+  else if (strncmp(line, "$GQGSV", 6) == 0) system = "QZSS";
+  else if (strncmp(line, "$GNGSV", 6) == 0) system = "Mixed";
   else return;
 
   GSVSequenceState* state = _getGSVState(system);
   if (!state) return;
 
-  int totalMsgs = getField(line, 1).toInt();
-  int msgNum    = getField(line, 2).toInt();
+  char fbuf[12];
+  int totalMsgs = getFieldBuf(line, 1, fbuf, sizeof(fbuf)) ? atoi(fbuf) : 0;
+  int msgNum    = getFieldBuf(line, 2, fbuf, sizeof(fbuf)) ? atoi(fbuf) : 0;
 
   if (msgNum == 1 || state->totalMsgs != totalMsgs) {
     state->currentVisible.clear();
     state->totalMsgs = totalMsgs;
   }
 
-  // 解析卫星数据（每组4个字段：ID, 仰角, 方位角, SNR）
+  // NMEA 0183 标准字段顺序（所有星系）: ID, 仰角(elevation), 方位角(azimuth), SNR
+  // 注意：BeiDou 遵循相同标准，不存在顺序互换；若模块固件异常请在此处添加特殊分支
   for (int i = 4; ; i += 4) {
-    String idStr = getField(line, i);
-    if (idStr.length() == 0) break;
+    if (!getFieldBuf(line, i, fbuf, sizeof(fbuf)) || fbuf[0] == '\0') break;
 
     SatData sat;
-    sat.system = system;
-    sat.id = idStr.toInt();
+    sat.system = system;  // Arduino String = const char* 赋值，仅在首次发现卫星时分配
+    sat.id = atoi(fbuf);
 
-    if (system == "BeiDou") {
-      // BeiDou方位角和仰角顺序相反
-      sat.azimuth   = getField(line, i + 1).toInt();
-      sat.elevation = getField(line, i + 2).toInt();
-    } else {
-      sat.elevation = getField(line, i + 1).toInt();
-      sat.azimuth   = getField(line, i + 2).toInt();
-    }
-    sat.snr = getField(line, i + 3).toInt();
+    char elBuf[8], azBuf[8], snrBuf[8];
+    getFieldBuf(line, i + 1, elBuf,  sizeof(elBuf));
+    getFieldBuf(line, i + 2, azBuf,  sizeof(azBuf));
+    getFieldBuf(line, i + 3, snrBuf, sizeof(snrBuf));
+
+    sat.elevation = elBuf[0]  ? atoi(elBuf)  : 0;
+    sat.azimuth   = azBuf[0]  ? atoi(azBuf)  : 0;
+    sat.snr       = snrBuf[0] ? atoi(snrBuf) : 0;
     sat.used = false;
     _storeSatellite(sat);
     state->currentVisible.push_back(sat.id);
@@ -292,7 +336,7 @@ void GPSManager::_parseGSV(const String& line) {
 
   state->lastMsgNum = msgNum;
   if (msgNum == totalMsgs) {
-    // 本序列完成，更新可见性标志
+    // 本序列完成，更新可见性标志（sat.system 是 String，== const char* 有效）
     for (auto& s : _satellites) {
       if (s.system == system) {
         s.visible = (std::find(state->currentVisible.begin(),
@@ -303,16 +347,19 @@ void GPSManager::_parseGSV(const String& line) {
   }
 }
 
-void GPSManager::_parseGSA(const String& line) {
-  String preferredSystem;
-  if (line.startsWith("$GPGSA")) preferredSystem = "GPS";
-  else if (line.startsWith("$GLGSA")) preferredSystem = "GLONASS";
-  else if (line.startsWith("$GAGSA")) preferredSystem = "Galileo";
-  else if (line.startsWith("$BDGSA")) preferredSystem = "BeiDou";
-  else if (line.startsWith("$GQGSA")) preferredSystem = "QZSS";
+void GPSManager::_parseGSA(const char* line) {
+  // 确定优先星系（用于多星系 ID 冲突时消歧）
+  // $GNGSA 表示多星系联合解算，不设优先系统（传空字符串，按 SNR/可见度评分）
+  const char* preferredSystem = "";
+  if      (strncmp(line, "$GPGSA", 6) == 0) preferredSystem = "GPS";
+  else if (strncmp(line, "$GLGSA", 6) == 0) preferredSystem = "GLONASS";
+  else if (strncmp(line, "$GAGSA", 6) == 0) preferredSystem = "Galileo";
+  else if (strncmp(line, "$BDGSA", 6) == 0) preferredSystem = "BeiDou";
+  else if (strncmp(line, "$GQGSA", 6) == 0) preferredSystem = "QZSS";
+  // $GNGSA → preferredSystem 保持 ""（正确行为：按可见度+SNR评分）
 
-  String f2 = getField(line, 2);
-  if (f2.length() == 0) {
+  char fbuf[16];
+  if (!getFieldBuf(line, 2, fbuf, sizeof(fbuf)) || fbuf[0] == '\0') {
     _gsaFixMode = 1;
     _pdop = 99.9f;
     _vdop = 99.9f;
@@ -320,7 +367,7 @@ void GPSManager::_parseGSA(const String& line) {
     return;
   }
 
-  _gsaFixMode = f2.toInt();
+  _gsaFixMode = atoi(fbuf);
 
   unsigned long now = millis();
   if (_lastGsaMillis == 0 || now - _lastGsaMillis > 400) {
@@ -328,27 +375,25 @@ void GPSManager::_parseGSA(const String& line) {
   }
   _lastGsaMillis = now;
 
-  // 解析参与定位的卫星ID（字段3-14）
+  // 解析参与定位的卫星 ID（NMEA GSA 字段 3-14，共 12 个槽位）
   for (int i = 3; i <= 14; i++) {
-    String sid = getField(line, i);
-    if (sid.length() > 0) {
-      int id = sid.toInt();
-      _markUsedSatellite(preferredSystem, id);
+    if (getFieldBuf(line, i, fbuf, sizeof(fbuf)) && fbuf[0] != '\0') {
+      _markUsedSatellite(preferredSystem, atoi(fbuf));
     }
   }
 
-  String fp = getField(line, 15);
-  _pdop = fp.length() > 0 ? fp.toFloat() : 99.9f;
-
-  String fv = getField(line, 17);
-  _vdop = fv.length() > 0 ? fv.toFloat() : 99.9f;
+  // 字段 15: PDOP，字段 16: HDOP（TinyGPSPlus 负责），字段 17: VDOP
+  _pdop = getFieldBuf(line, 15, fbuf, sizeof(fbuf)) && fbuf[0] != '\0'
+          ? strtof(fbuf, nullptr) : 99.9f;
+  _vdop = getFieldBuf(line, 17, fbuf, sizeof(fbuf)) && fbuf[0] != '\0'
+          ? strtof(fbuf, nullptr) : 99.9f;
 }
 
 void GPSManager::_clearUsedFlags() {
   for (auto& sat : _satellites) sat.used = false;
 }
 
-void GPSManager::_markUsedSatellite(const String& preferredSystem, int id) {
+void GPSManager::_markUsedSatellite(const char* preferredSystem, int id) {
   int bestIndex = -1;
   int bestScore = -1;
 
@@ -357,7 +402,9 @@ void GPSManager::_markUsedSatellite(const String& preferredSystem, int id) {
     if (sat.id != id) continue;
 
     int score = 0;
-    if (preferredSystem.length() > 0 && sat.system == preferredSystem) score += 100;
+    // sat.system 是 Arduino String，== const char* 有效
+    if (preferredSystem && preferredSystem[0] != '\0' && sat.system == preferredSystem)
+      score += 100;
     if (sat.visible) score += 10;
     score += constrain(sat.snr, 0, 9);
 
@@ -372,24 +419,23 @@ void GPSManager::_markUsedSatellite(const String& preferredSystem, int id) {
   }
 }
 
-void GPSManager::_parseGGA(const String& line) {
-  String f6 = getField(line, 6);
-  if (f6.length() > 0) {
-    _ggaFixQuality = f6.toInt();
+void GPSManager::_parseGGA(const char* line) {
+  char fbuf[16];
+  if (getFieldBuf(line, 6, fbuf, sizeof(fbuf)) && fbuf[0] != '\0') {
+    _ggaFixQuality = atoi(fbuf);
     _lastGgaMillis = millis();
   } else {
     _ggaFixQuality = 0;
     _lastGgaMillis = 0;
   }
 
-  String f11 = getField(line, 11);
-  if (f11.length() > 0) {
-    _geoidHeight = f11.toFloat();
+  if (getFieldBuf(line, 11, fbuf, sizeof(fbuf)) && fbuf[0] != '\0') {
+    _geoidHeight = strtof(fbuf, nullptr);
     _geoidValid = true;
   }
 }
 
-GSVSequenceState* GPSManager::_getGSVState(const String& system) {
+GSVSequenceState* GPSManager::_getGSVState(const char* system) {
   for (int i = 0; i < _gsvCount; i++) {
     if (_gsvStates[i].system == system) return &_gsvStates[i];
   }
@@ -410,6 +456,29 @@ void GPSManager::_storeSatellite(const SatData& sat) {
     }
   }
   _satellites.push_back(sat);
+}
+
+// 清除 60s 无信号后积累的陈旧卫星条目（改进 6）
+void GPSManager::purgeStaleSatellites() {
+  _satellites.clear();
+  for (int i = 0; i < _gsvCount; i++) {
+    _gsvStates[i].currentVisible.clear();
+    _gsvStates[i].totalMsgs  = 0;
+    _gsvStates[i].lastMsgNum = 0;
+  }
+}
+
+// GPS 省电模式（改进 D）：ATGM336H/CASIC PMTK225 命令
+void GPSManager::enablePowerSave(bool enable) {
+  if (_powerSaveActive == enable) return;
+  _powerSaveActive = enable;
+  if (enable) {
+    // AlwaysLocate™ 轻度省电：2000ms 全功率采集 + 500ms 低功率守候
+    _sendPMTK("PMTK225,2,2000,500");
+  } else {
+    // 恢复全功率正常模式
+    _sendPMTK("PMTK225,0");
+  }
 }
 
 const char* GPSManager::nmeaLine(int index) const {

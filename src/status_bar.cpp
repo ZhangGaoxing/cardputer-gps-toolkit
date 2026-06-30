@@ -50,12 +50,21 @@ void StatusBar::_drawBattery(int rightEdgeX, int y) {
   BatteryManager& bat = BatteryManager::instance();
 
   int pct = bat.percentage();
+  BatteryAlert alert = bat.alertLevel();
 
-  // 百分比文字
+  // 百分比文字（Critical 加 '!' 前缀警告）
   cv.setTextSize(1);
-  cv.setTextColor(UI_TEXT);
-  char pctBuf[6];
-  snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
+  char pctBuf[8];
+  if (alert == BatteryAlert::Critical10) {
+    snprintf(pctBuf, sizeof(pctBuf), "!%d%%", pct);
+    cv.setTextColor(TFT_RED);
+  } else if (alert == BatteryAlert::Low20) {
+    snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
+    cv.setTextColor(TFT_YELLOW);
+  } else {
+    snprintf(pctBuf, sizeof(pctBuf), "%d%%", pct);
+    cv.setTextColor(UI_TEXT);
+  }
   int textW = strlen(pctBuf) * 6;
 
   // 电池图标外框（14x8）
@@ -68,16 +77,28 @@ void StatusBar::_drawBattery(int rightEdgeX, int y) {
   cv.setCursor(textX, y);
   cv.print(pctBuf);
 
-  // 电池外框
-  cv.drawRect(battLeft, y, bw, bh, UI_TEXT);
+  // 电池外框（告警时变色）
+  uint16_t frameColor = (alert == BatteryAlert::Critical10) ? TFT_RED
+                      : (alert == BatteryAlert::Low20)      ? TFT_YELLOW
+                      : UI_TEXT;
+  cv.drawRect(battLeft, y, bw, bh, frameColor);
 
   // 电池正极凸起
-  cv.fillRect(battLeft + bw, y + 2, 2, 4, UI_TEXT);
+  cv.fillRect(battLeft + bw, y + 2, 2, 4, frameColor);
 
-  // 电池内部填充
+  // 电池内部填充（阈值与 BatteryAlert 对齐）
   int fillW = (int)((pct / 100.0f) * (bw - 2));
   if (fillW > 0) {
-    uint16_t batColor = (pct > 60) ? UI_ACTIVE : (pct > 30) ? TFT_YELLOW : TFT_RED;
+    uint16_t batColor = (pct > 20) ? UI_ACTIVE
+                      : (pct > 10) ? TFT_YELLOW
+                      : TFT_RED;
     cv.fillRect(battLeft + 1, y + 1, fillW, bh - 2, batColor);
+  }
+
+  // 充电中：在百分比后显示 '+' 号
+  if (bat.isCharging()) {
+    cv.setTextColor(TFT_GREEN);
+    cv.setCursor(battRight + 1, y);
+    cv.print("+");
   }
 }

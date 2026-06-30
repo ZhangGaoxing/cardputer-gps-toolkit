@@ -31,3 +31,10 @@ void BatteryManager::_readNow() {
   // 检测充电状态（如果API支持）
   _charging = M5Cardputer.Power.isCharging();
 }
+
+BatteryAlert BatteryManager::alertLevel() const {
+  if (_charging) return BatteryAlert::None;  // 充电中不告警
+  if (_percentage <= 10) return BatteryAlert::Critical10;
+  if (_percentage <= 20) return BatteryAlert::Low20;
+  return BatteryAlert::None;
+}

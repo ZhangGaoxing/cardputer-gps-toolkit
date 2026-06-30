@@ -328,7 +328,7 @@ void FnSos::_drawPagePayload() {
   } else {
     cv.setTextColor(TFT_DARKGREY);
     cv.setCursor(4, 124);
-    cv.print("[b]Broadcast SOS  [Tab]Page");
+    cv.print("[b]Broadcast SOS");
   }
 }
 

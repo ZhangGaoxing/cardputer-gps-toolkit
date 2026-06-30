@@ -119,6 +119,10 @@ public:
   // GPS串口状态
   GPSState state() const { return _gpsState; }
 
+  /** 启用/禁用 GPS 省电模式（ATGM336H AlwaysLocate™ 定期模式） */
+  void enablePowerSave(bool enable);
+  bool isPowerSaveActive() const { return _powerSaveActive; }
+
 private:
   GPSManager() = default;
   GPSManager(const GPSManager&) = delete;
@@ -129,14 +133,15 @@ private:
   void _openSerial();
   void _closeSerial();
 
-  // NMEA解析
-  void _nmeaDispatcher(const String& line);
-  void _parseGSV(const String& line);
-  void _parseGSA(const String& line);
-  void _parseGGA(const String& line);
+  // NMEA解析（使用 const char* 避免堆碎片化）
+  void _nmeaDispatcher(const char* line);
+  void _parseGSV(const char* line);
+  void _parseGSA(const char* line);
+  void _parseGGA(const char* line);
   void _clearUsedFlags();
-  void _markUsedSatellite(const String& preferredSystem, int id);
-  GSVSequenceState* _getGSVState(const String& system);
+  void _markUsedSatellite(const char* preferredSystem, int id);
+  GSVSequenceState* _getGSVState(const char* system);
+  void purgeStaleSatellites();
   void _storeSatellite(const SatData& sat);
   void _captureReliableFixSnapshot();
   bool _hasRecentParsedNmea() const;
@@ -148,6 +153,8 @@ private:
   unsigned long _lastValidGpsMillis = 0;
   unsigned long _lastNmeaMillis = 0;
   unsigned long _lastGgaMillis = 0;
+  unsigned long _satPurgeCheckMs = 0;
+  bool _powerSaveActive = false;
 
   // 卫星数据
   std::vector<SatData> _satellites;

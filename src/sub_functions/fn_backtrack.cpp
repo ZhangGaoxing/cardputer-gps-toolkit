@@ -165,9 +165,6 @@ void FnBacktrack::_drawInactive() {
     cv.print(err);
   }
 
-  cv.setTextColor(TFT_DARKGREY);
-  cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[`]Back");
 }
 
 void FnBacktrack::_drawActive() {
@@ -200,7 +197,7 @@ void FnBacktrack::_drawActive() {
     cv.setCursor(18, 84);
     cv.printf("Sat:%d HDOP:%.1f", gps.satellitesUsed(), gps.hdop());
     cv.setCursor(4, SCREEN_H - 10);
-    cv.print("[c]Cancel  [`]Back");
+    cv.print("[c]Cancel");
     return;
   }
 
@@ -251,7 +248,7 @@ void FnBacktrack::_drawActive() {
 
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[c]Cancel  [g]GPX  [`]Back");
+  cv.print("[c]Cancel  [g]GPX");
 }
 
 void FnBacktrack::_drawGpxList() {
@@ -283,7 +280,7 @@ void FnBacktrack::_drawGpxList() {
     cv.setCursor(22, 72);
     cv.print("Save tracks to SD first");
     cv.setCursor(4, SCREEN_H - 10);
-    cv.print("[r]Refresh  [`]Back");
+    cv.print("[r]Refresh");
     return;
   }
 
@@ -317,7 +314,7 @@ void FnBacktrack::_drawGpxList() {
 
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[;][.]Move [Ent]Load [r]Refresh [`]Back");
+  cv.print("[;][.]Move [Ent]Load [r]Refresh");
 }
 
 void FnBacktrack::_refreshGpxFiles() {

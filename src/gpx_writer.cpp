@@ -177,12 +177,56 @@ bool GpxWriter::startNewSegment() {
   if (_pointCount <= 0) return true;
 
   if (!_writeRaw(GPX_SEGMENT_BREAK) || !_flushIfDue(true)) {
-    if (_file) _file.close();
-    _state = GpxWriterState::Error;
-    _sdReady = false;
-    _setError("Cannot write GPX segment");
+    _writeFailCount++;
+    if (_writeFailCount >= 3) {
+      if (_file) _file.close();
+      _state = GpxWriterState::Error;
+      _sdReady = false;
+      _setError("GPX segment failed");
+    } else {
+      if (_file) _file.flush();
+      _setError("GPX segment retry");
+    }
     return false;
   }
+  _writeFailCount = 0;
+  return true;
+}
+
+// SD 卡抗拾后自动恢复：重新打开临时文件并写入分段符，保持 GPX 合法，然后恢复 Recording 状态
+bool GpxWriter::recoverFromError() {
+  if (_state != GpxWriterState::Error) return true;
+  if (_tmpFilePath[0] == '\0') {
+    _setError("No active recording to recover");
+    return false;
+  }
+
+  // 重新初始化 SD
+  if (!SD.begin(SD_CS_PIN, SPI, SD_SPI_FREQ) &&
+      !SD.begin(SD_CS_PIN, SPI, SD_SPI_FREQ_SAFE)) {
+    _setError("SD recover: init failed");
+    return false;
+  }
+  _sdReady = true;
+
+  // 以追加模式重新打开临时文件
+  _file = SD.open(_tmpFilePath, FILE_APPEND);
+  if (!_file) {
+    _setError("SD recover: reopen failed");
+    return false;
+  }
+
+  // 写入分段符以标记间隙（保持 GPX 合法性）
+  if (!_writeRaw(GPX_SEGMENT_BREAK)) {
+    if (_file) _file.close();
+    _setError("SD recover: segment write failed");
+    return false;
+  }
+  _file.flush();
+
+  _state = GpxWriterState::Recording;
+  _writeFailCount = 0;
+  _clearError();
   return true;
 }
 
@@ -242,13 +286,21 @@ bool GpxWriter::appendTrackPoint(const GpxTrackPoint& point) {
   _pointsSinceFlush++;
 
   if (!ok || !_flushIfDue(false)) {
-    if (_file) _file.close();
-    _state = GpxWriterState::Error;
-    _sdReady = false;
-    _setError("GPX write failed");
+    _writeFailCount++;
+    if (_writeFailCount >= 3) {
+      if (_file) _file.close();
+      _state = GpxWriterState::Error;
+      _sdReady = false;
+      _setError("GPX write failed");
+    } else {
+      // 临时写入失败，尝试 flush 恢复；调用方可在下一帧重试
+      if (_file) _file.flush();
+      _setError("GPX write retry");
+    }
     return false;
   }
 
+  _writeFailCount = 0;
   _pointCount++;
   return true;
 }

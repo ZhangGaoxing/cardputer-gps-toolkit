@@ -29,6 +29,7 @@
 #include "sub_functions/fn_settings.h"
 #include "sub_functions/fn_about.h"
 #include "sub_functions/fn_compass.h"
+#include "sub_functions/fn_twilight.h"
 
 MenuSystem& MenuSystem::instance() {
   static MenuSystem ms;
@@ -50,6 +51,7 @@ void MenuSystem::begin() {
   _items.push_back(new FnWaypoint());
   _items.push_back(new FnGotoNav());
   _items.push_back(new FnCompass());
+  _items.push_back(new FnTwilight());
   _items.push_back(new FnNmeaMonitor());
   _items.push_back(new FnSettings());
   _items.push_back(new FnAbout());

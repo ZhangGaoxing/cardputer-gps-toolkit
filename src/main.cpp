@@ -90,6 +90,17 @@ void loop() {
 
   BatteryManager::instance().update();
   IMUManager::instance().update();
+
+  // 改进 D+E：低电量时自动开启 GPS 省电模式
+  {
+    static BatteryAlert lastBatAlert = BatteryAlert::None;
+    BatteryAlert batAlert = BatteryManager::instance().alertLevel();
+    if (batAlert != lastBatAlert) {
+      lastBatAlert = batAlert;
+      GPSManager::instance().enablePowerSave(batAlert != BatteryAlert::None);
+    }
+  }
+
   NavigationManager::instance().update();
 
   TripFixQuality tripQuality;
@@ -148,6 +159,16 @@ void loop() {
       } else {
         // GpxWriter moves itself to Error and exposes lastError() for the UI.
       }
+    }
+  }
+
+  // 改进 C：GPX SD 卡抖动后自动恢复（每 5s 尝试一次）
+  if (gw.state() == GpxWriterState::Error) {
+    static unsigned long lastRecoverAttemptMs = 0;
+    unsigned long nowMs = millis();
+    if (nowMs - lastRecoverAttemptMs >= 5000UL) {
+      lastRecoverAttemptMs = nowMs;
+      gw.recoverFromError();
     }
   }
 

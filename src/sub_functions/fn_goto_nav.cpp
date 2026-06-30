@@ -100,9 +100,6 @@ void FnGotoNav::_drawNoTarget() {
     cv.print(err);
   }
 
-  cv.setTextColor(TFT_DARKGREY);
-  cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[`]Back");
 }
 
 void FnGotoNav::_drawActive() {
@@ -134,7 +131,7 @@ void FnGotoNav::_drawActive() {
     cv.setCursor(20, 84);
     cv.printf("Sat:%d HDOP:%.1f", gps.satellitesUsed(), gps.hdop());
     cv.setCursor(4, SCREEN_H - 10);
-    cv.print("[c]Cancel  [`]Back");
+    cv.print("[c]Cancel");
     return;
   }
 
@@ -173,7 +170,7 @@ void FnGotoNav::_drawActive() {
 
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print("[c]Cancel  [`]Back");
+  cv.print("[c]Cancel");
 }
 
 void FnGotoNav::drawIcon(int x, int y, int size, uint16_t color) {

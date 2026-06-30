@@ -150,7 +150,7 @@ void FnPeers::onUpdate(bool force) {
   cv.drawLine(0, SCREEN_H - 12, SCREEN_W - 1, SCREEN_H - 12, UI_DIM);
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 9);
-  cv.print("[;]/[.]Scroll  [`]Back");
+  cv.print("[;]/[.]Scroll");
   if (total > 0) {
     char page[16];
     snprintf(page, sizeof(page), "%d/%u", _scroll + 1, (unsigned)total);

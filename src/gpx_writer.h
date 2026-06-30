@@ -60,6 +60,9 @@ public:
   bool startNewSegment();
   bool appendTrackPoint(const GpxTrackPoint& point);
 
+  /** SD 卡抓取恢复：重新打开文件并写入分段符以标记间隙，然后恢复 Recording 状态 */
+  bool recoverFromError();
+
   void setRecordIntervalIndex(uint8_t index);
   uint8_t recordIntervalIndex() const { return _recordIntervalIndex; }
   unsigned long recordIntervalMs() const;
@@ -111,6 +114,7 @@ private:
   unsigned long _recordingStartMs = 0;
   unsigned long _lastFlushMs = 0;
   uint8_t _recordIntervalIndex = GPX_RECORD_INTERVAL_DEFAULT_INDEX;
+  uint8_t _writeFailCount = 0;  // SD 卡连续写入失败次数，达到阈値才进入 Error
 };
 
 #endif

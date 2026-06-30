@@ -113,7 +113,7 @@
 #define ZOOM_MIN      6
 #define ZOOM_MAX      18
 #define ZOOM_DEFAULT  15
-#define MAP_TILE_CACHE_SIZE          2
+#define MAP_TILE_CACHE_SIZE          4   // 240×135 屏最多需 2×2 块瓦片，4 块缓存覆盖全视口
 #define MAP_NEGATIVE_CACHE_SIZE      4
 #define MAP_POSITION_SAVE_INTERVAL_MS 5000UL
 #define MAP_MAX_TILE_BYTES           36864
@@ -234,6 +234,7 @@ enum ScreenID {
   SCR_NMEA_MONITOR,
   SCR_SETTINGS,
   SCR_ABOUT,
+  SCR_TWILIGHT,
   SCR_COUNT
 };
 
@@ -256,7 +257,8 @@ enum IconType {
   ICON_NMEA,
   ICON_SETTINGS,
   ICON_ABOUT,
-  ICON_COMPASS
+  ICON_COMPASS,
+  ICON_TWILIGHT
 };
 
 // ==================================================================

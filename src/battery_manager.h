@@ -7,6 +7,13 @@
 
 #include <Arduino.h>
 
+/** 低电量告警级别（改进 E） */
+enum class BatteryAlert {
+  None,        // >20%，正常
+  Low20,       // <=20%，低电量警告（建议开启 GPS 省电）
+  Critical10   // <=10%，严重低电（建议立即结束操作）
+};
+
 class BatteryManager {
 public:
   /** 获取单例实例 */
@@ -23,6 +30,9 @@ public:
 
   /** 是否正在充电 */
   bool isCharging() const { return _charging; }
+
+  /** 低电量告警级别 */
+  BatteryAlert alertLevel() const;
 
 private:
   BatteryManager() = default;

@@ -453,8 +453,8 @@ void FnWaypoint::_drawDetail() {
   // 底部操作提示
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(4, SCREEN_H - 10);
-  cv.print(nav.isTarget(wp->id) ? "[g]Stop  [d]Delete  [`]Back"
-                                : "[g]Go-to [d]Delete  [`]Back");
+  cv.print(nav.isTarget(wp->id) ? "[g]Stop  [d]Delete"
+                                : "[g]Go-to [d]Delete");
 }
 
 // ==================================================================
@@ -530,12 +530,10 @@ void FnWaypoint::_drawCreate() {
     cv.print("List full! Delete some first.");
   }
 
-  // 底部操作提示（两行，避免溢出）
+  // 底部操作提示
   cv.setTextColor(TFT_DARKGREY);
-  cv.setCursor(2, SCREEN_H - 20);
-  cv.print("[Tab]Name  [Sp]Note  [;][.]Type");
-  cv.setCursor(2, SCREEN_H - 10);
-  cv.print("[g]Save GPS  [`]Back");
+  cv.setCursor(4, SCREEN_H - 10);
+  cv.print("[g]Save GPS  [Sp]Note  [;][.]Type");
 }
 
 // ==================================================================
@@ -572,7 +570,7 @@ void FnWaypoint::_drawDeleteConfirm() {
 
   cv.setTextColor(TFT_DARKGREY);
   cv.setCursor(30, 84);
-  cv.print("[n] or [`] Cancel");
+  cv.print("[n] Cancel");
 
   if (wm.lastError()[0] != '\0') {
     cv.setTextColor(TFT_RED);
