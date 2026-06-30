@@ -255,7 +255,8 @@ enum IconType {
   ICON_GOTO_NAV,
   ICON_NMEA,
   ICON_SETTINGS,
-  ICON_ABOUT
+  ICON_ABOUT,
+  ICON_COMPASS
 };
 
 // ==================================================================

@@ -82,19 +82,25 @@ void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
 
   switch (iconType) {
     case ICON_DASHBOARD: {
-      cv.fillRoundRect(px(x, s, 13), px(y, s, 17),
-                       unit(s, 74), unit(s, 65), unit(s, 13), color);
-      fillCapsuleH(cv, px(x, s, 27), px(y, s, 34),
-                   px(x, s, 41), unit(s, 3), bgColor);
-      fillCapsuleH(cv, px(x, s, 59), px(y, s, 34),
-                   px(x, s, 73), unit(s, 3), bgColor);
-      cv.fillCircle(cx, px(y, s, 57), unit(s, 18), bgColor);
-      cv.fillCircle(cx, px(y, s, 57), unit(s, 12), color);
-      thickLine(cv, cx, px(y, s, 57), px(x, s, 64), px(y, s, 47),
-                stroke, bgColor);
-      cv.fillCircle(cx, px(y, s, 57), unit(s, 4), bgColor);
-      fillCapsuleH(cv, px(x, s, 31), px(y, s, 86),
-                   px(x, s, 69), unit(s, 3), color);
+      // 速度计表盘：半圆弧表盘 + 刻度 + 指针
+      int ro = unit(s, 38), ri = unit(s, 24);
+      cv.fillCircle(cx, cy, ro, color);
+      cv.fillCircle(cx, cy, ri, bgColor);
+      // 切除底部，形成开口付表盘
+      cv.fillRect(cx - ro, cy + unit(s, 26), ro * 2 + 2, ro + 2, bgColor);
+      // 5 刻度线（210°, 285°, 360°, 75°, 150°）
+      for (int i = 0; i < 5; i++) {
+        float a = (210.0f + i * 75.0f) * (float)M_PI / 180.0f;
+        cv.drawLine(cx + (int)(sinf(a) * ri),       cy - (int)(cosf(a) * ri),
+                    cx + (int)(sinf(a) * (ro - 1)), cy - (int)(cosf(a) * (ro - 1)),
+                    bgColor);
+      }
+      // 指针指向 330°（偏低速位置）
+      float na = 330.0f * (float)M_PI / 180.0f;
+      thickLine(cv, cx, cy,
+                cx + (int)(sinf(na) * unit(s, 22)),
+                cy - (int)(cosf(na) * unit(s, 22)), stroke, bgColor);
+      cv.fillCircle(cx, cy, unit(s, 5), bgColor);
       break;
     }
 
@@ -161,51 +167,58 @@ void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
     }
 
     case ICON_3D_GLOBE: {
-      cv.fillEllipse(cx, cy, unit(s, 43), unit(s, 19), color);
-      cv.fillEllipse(cx, cy, unit(s, 31), unit(s, 10), bgColor);
-      cv.fillCircle(cx, cy, unit(s, 31), color);
-      cv.fillCircle(px(x, s, 40), px(y, s, 37), unit(s, 7), bgColor);
-      fillCapsuleV(cv, cx, px(y, s, 24), px(y, s, 76),
-                   stroke / 2, bgColor);
-      fillCapsuleH(cv, px(x, s, 29), cy, px(x, s, 71),
-                   stroke / 2, bgColor);
-      cv.fillEllipse(px(x, s, 35), cy, unit(s, 6), unit(s, 24), bgColor);
-      cv.fillEllipse(px(x, s, 65), cy, unit(s, 6), unit(s, 24), bgColor);
-      cv.fillCircle(px(x, s, 76), px(y, s, 27), unit(s, 5), color);
+      // 地球仪：填充圆 + 纬线 + 经线
+      cv.fillCircle(cx, cy, unit(s, 36), color);
+      // 三条纬线（赤道 + 南北回归线）
+      fillCapsuleH(cv, cx - unit(s, 35), cy,
+                   cx + unit(s, 35), unit(s, 2), bgColor);
+      fillCapsuleH(cv, cx - unit(s, 27), cy - unit(s, 17),
+                   cx + unit(s, 27), unit(s, 2), bgColor);
+      fillCapsuleH(cv, cx - unit(s, 27), cy + unit(s, 17),
+                   cx + unit(s, 27), unit(s, 2), bgColor);
+      // 本初子午线（垂直）
+      fillCapsuleV(cv, cx, cy - unit(s, 36), cy + unit(s, 36), unit(s, 2), bgColor);
+      // 偏移经线（椭圆环）
+      cv.fillEllipse(cx, cy, unit(s, 14), unit(s, 36), bgColor);
+      cv.fillEllipse(cx, cy, unit(s, 10), unit(s, 32), color);
       break;
     }
 
     case ICON_WORLD_MAP: {
-      cv.fillRoundRect(px(x, s, 11), px(y, s, 22),
-                       unit(s, 78), unit(s, 56), unit(s, 8), color);
-      cv.fillRoundRect(px(x, s, 17), px(y, s, 28),
-                       unit(s, 66), unit(s, 44), unit(s, 5), bgColor);
-      cv.fillEllipse(px(x, s, 31), px(y, s, 42), unit(s, 10), unit(s, 13),
-                     color);
-      cv.fillTriangle(px(x, s, 29), px(y, s, 51), px(x, s, 43), px(y, s, 52),
-                      px(x, s, 36), px(y, s, 66), color);
-      cv.fillEllipse(px(x, s, 61), px(y, s, 42), unit(s, 18), unit(s, 10),
-                     color);
-      cv.fillTriangle(px(x, s, 52), px(y, s, 48), px(x, s, 75), px(y, s, 52),
-                      px(x, s, 61), px(y, s, 64), color);
-      cv.fillCircle(px(x, s, 72), px(y, s, 61), unit(s, 5), color);
-      fillCapsuleH(cv, px(x, s, 27), px(y, s, 84),
-                   px(x, s, 73), unit(s, 3), color);
+      // 矩形地图框 + 简化大陆
+      cv.fillRoundRect(px(x, s, 9),  px(y, s, 17),
+                       unit(s, 82),  unit(s, 66), unit(s, 4), color);
+      cv.fillRect(px(x, s, 13), px(y, s, 21),
+                  unit(s, 74), unit(s, 58), bgColor);
+      cv.fillEllipse(px(x, s, 25), px(y, s, 37), unit(s, 8),  unit(s, 11), color); // 北美
+      cv.fillEllipse(px(x, s, 23), px(y, s, 58), unit(s, 5),  unit(s, 11), color); // 南美
+      cv.fillEllipse(px(x, s, 47), px(y, s, 35), unit(s, 6),  unit(s,  8), color); // 欧洲
+      cv.fillEllipse(px(x, s, 48), px(y, s, 54), unit(s, 6),  unit(s, 13), color); // 非洲
+      cv.fillEllipse(px(x, s, 67), px(y, s, 33), unit(s, 14), unit(s, 11), color); // 亚洲
+      cv.fillCircle( px(x, s, 73), px(y, s, 57), unit(s, 5),              color);  // 澳洲
       break;
     }
 
     case ICON_OFFLINE_MAP: {
-      int top = px(y, s, 18);
-      int h = unit(s, 62);
-      int w = unit(s, 22);
-      cv.fillRoundRect(px(x, s, 13), top, w, h, unit(s, 5), color);
-      cv.fillRoundRect(px(x, s, 39), top + unit(s, 8), w, h,
-                       unit(s, 5), color);
-      cv.fillRoundRect(px(x, s, 65), top, w, h, unit(s, 5), color);
-      thickLine(cv, px(x, s, 26), px(y, s, 68),
-                px(x, s, 50), px(y, s, 48), stroke, bgColor);
-      thickLine(cv, px(x, s, 50), px(y, s, 48),
-                px(x, s, 76), px(y, s, 64), stroke, bgColor);
+      // 带折角的地图 + 下载箭头
+      int foldSz = unit(s, 18);
+      int mTopX  = px(x, s, 13), mTopY = px(y, s, 17);
+      int mW     = unit(s, 74),  mH    = unit(s, 66);
+      cv.fillRect(mTopX,               mTopY,          mW - foldSz, mH,          color);
+      cv.fillRect(mTopX + mW - foldSz, mTopY + foldSz, foldSz,      mH - foldSz, color);
+      cv.fillTriangle(mTopX + mW - foldSz, mTopY,
+                      mTopX + mW,          mTopY + foldSz,
+                      mTopX + mW - foldSz, mTopY + foldSz, bgColor);
+      // 下载箭头（bgColor）
+      int arCX  = cx;
+      int arTop = mTopY + unit(s, 8);
+      int arBot = mTopY + unit(s, 38);
+      fillCapsuleV(cv, arCX, arTop, arBot, unit(s, 4), bgColor);
+      cv.fillTriangle(arCX - unit(s, 10), arBot,
+                      arCX + unit(s, 10), arBot,
+                      arCX,               arBot + unit(s, 12), bgColor);
+      fillCapsuleH(cv, arCX - unit(s, 12), arBot + unit(s, 14),
+                   arCX + unit(s, 12),     unit(s, 3), bgColor);
       break;
     }
 
@@ -239,18 +252,13 @@ void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
     }
 
     case ICON_GOTO_NAV: {
-      cv.fillCircle(px(x, s, 72), px(y, s, 28), unit(s, 14), color);
-      cv.fillCircle(px(x, s, 72), px(y, s, 28), unit(s, 6), bgColor);
-      fillCapsuleH(cv, px(x, s, 54), px(y, s, 28),
-                   px(x, s, 90), unit(s, 2), color);
-      fillCapsuleV(cv, px(x, s, 72), px(y, s, 10),
-                   px(y, s, 46), unit(s, 2), color);
-      cv.fillTriangle(px(x, s, 18), px(y, s, 78),
-                      px(x, s, 45), px(y, s, 19),
-                      px(x, s, 62), px(y, s, 86), color);
-      cv.fillTriangle(px(x, s, 41), px(y, s, 54),
-                      px(x, s, 45), px(y, s, 19),
-                      px(x, s, 62), px(y, s, 86), bgColor);
+      // 导航游标（GPS 定位光标形状）
+      cv.fillTriangle(px(x, s, 52), px(y, s, 12),
+                      px(x, s, 13), px(y, s, 86),
+                      px(x, s, 66), px(y, s, 72), color);
+      cv.fillTriangle(px(x, s, 13), px(y, s, 86),
+                      px(x, s, 66), px(y, s, 72),
+                      px(x, s, 42), px(y, s, 55), bgColor);
       break;
     }
 
@@ -277,6 +285,29 @@ void drawMenuIcon(M5Canvas& cv, int iconType, int x, int y, int size,
       cv.fillCircle(cx, px(y, s, 31), unit(s, 5), bgColor);
       fillCapsuleV(cv, cx, px(y, s, 45), px(y, s, 71),
                    unit(s, 4), bgColor);
+      break;
+    }
+
+    case ICON_COMPASS: {
+      // 指南针：表圈 + 表面 + 刻度 + 南北针
+      cv.fillCircle(cx, cy, unit(s, 36), color);   // 表圈
+      cv.fillCircle(cx, cy, unit(s, 26), bgColor); // 表面背景
+      // 四个基数刻度（color 短线）
+      int rTi = unit(s, 19), rTo = unit(s, 25);
+      for (int i = 0; i < 4; i++) {
+        float a  = i * 90.0f * (float)M_PI / 180.0f;
+        int lx1 = cx + (int)(sinf(a) * rTi), ly1 = cy - (int)(cosf(a) * rTi);
+        int lx2 = cx + (int)(sinf(a) * rTo), ly2 = cy - (int)(cosf(a) * rTo);
+        cv.drawLine(lx1,     ly1, lx2,     ly2, color);
+        cv.drawLine(lx1 + 1, ly1, lx2 + 1, ly2, color);
+      }
+      // 北针（朝上，较长）
+      int nTip = unit(s, 22), nW = unit(s, 9);
+      cv.fillTriangle(cx, cy - nTip, cx - nW, cy, cx + nW, cy, color);
+      // 南针（朝下，略短）
+      int sTail = unit(s, 16), sW = unit(s, 7);
+      cv.fillTriangle(cx, cy + sTail, cx - sW, cy, cx + sW, cy, color);
+      cv.fillCircle(cx, cy, unit(s, 5), bgColor);
       break;
     }
 

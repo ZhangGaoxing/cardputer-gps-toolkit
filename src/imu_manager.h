@@ -18,6 +18,8 @@ public:
   float gForce() const      { return _gForce; }
   float temperature() const { return _temp; }
   float maxGForce() const   { return _maxG; }
+  // 陀螺仪Z轴角速度（°/s），顺时针为正，用于偏航积分
+  float yawRate() const     { return _gz; }
 private:
   IMUManager() = default;
   bool _available = false;
